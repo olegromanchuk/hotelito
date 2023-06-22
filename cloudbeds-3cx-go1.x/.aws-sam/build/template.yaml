@@ -1,0 +1,49 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'cloudbeds-3cx-go1.x
+
+  SAM Template for cloudbeds-3cx-go1.x
+
+  '
+Globals:
+  Function:
+    Timeout: 5
+    MemorySize: 128
+Resources:
+  CloudBedsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: CloudBedsFunction
+      Handler: cloudbeds
+      Runtime: go1.x
+      Architectures:
+      - x86_64
+      Events:
+        CatchAll:
+          Type: Api
+          Properties:
+            Path: /hello
+            Method: GET
+      Environment:
+        Variables:
+          PARAM1: VALUE
+    Metadata:
+      SamResourceId: CloudBedsFunction
+Outputs:
+  CloudbedsAPI:
+    Description: API Gateway endpoint URL for Prod environment for Cloudbeds-3CX integration
+      Function
+    Value:
+      Fn::Sub: https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/
+  CloudbedsFunction:
+    Description: Cloudbeds Lambda Function ARN
+    Value:
+      Fn::GetAtt:
+      - CloudBedsFunction
+      - Arn
+  CloudbedsFunctionIamRole:
+    Description: Implicit IAM Role created for Cloudbeds function
+    Value:
+      Fn::GetAtt:
+      - CloudBedsFunction
+      - Arn
