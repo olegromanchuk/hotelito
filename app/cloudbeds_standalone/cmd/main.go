@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
+	"github.com/olegromanchuk/hotelito/pkg/hotel/cloudbeds"
 	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
@@ -56,10 +57,14 @@ func main() {
 
 	r := mux.NewRouter()
 
+	//   ---------------------- Cloudbed parts ----------------------
+	//create cloudbeds client
+	clbClient := cloudbeds.New(log)
+
 	//auth urls
 	r.HandleFunc("/", handleMain).Methods("GET")
-	r.HandleFunc("/login", handleLogin).Methods("GET")
-	r.HandleFunc("/callback", handleCallback).Methods("GET")
+	r.HandleFunc("/login", clbClient.HandleLogin).Methods("GET")
+	r.HandleFunc("/callback", clbClient.HandleCallback).Methods("GET")
 
 	//test/troubleshooting urls
 	r.HandleFunc("/housekeepings/{roomPhoneNumber}/{housekeepingStatus}/{housekeeperID}", handleHousekeepingAssignment).Methods("GET")

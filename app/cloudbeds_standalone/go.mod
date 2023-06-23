@@ -1,4 +1,4 @@
-module cloudbeds
+module github.com/olegromanchuk/hotelito
 
 go 1.19
 
@@ -6,8 +6,13 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/joho/godotenv v1.5.1
 	github.com/sirupsen/logrus v1.9.3
+	go.etcd.io/bbolt v1.3.7
 	golang.org/x/oauth2 v0.9.0
 )
+
+replace github.com/olegromanchuk/hotelito/pkg/hotel => ./pkg/hotel
+
+replace github.com/olegromanchuk/hotelito/pkg/secrets => ./pkg/secrets
 
 require (
 	github.com/golang/protobuf v1.5.2 // indirect

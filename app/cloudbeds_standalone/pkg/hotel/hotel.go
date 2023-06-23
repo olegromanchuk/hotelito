@@ -1,4 +1,4 @@
-package models
+package hotel
 
 /*
 	Response: {
@@ -60,6 +60,7 @@ package models
 	}
 */
 
+// Room is a struct that represents a room in a hospitality. It might be different from particular implementation, but it is a common interface
 type Room struct {
 	RoomID            string `json:"roomID"`
 	RoomName          string `json:"roomName"`
@@ -71,4 +72,11 @@ type Room struct {
 	RoomTypeName      string `json:"roomTypeName"`
 	RoomTypeNameShort string `json:"roomTypeNameShort"`
 	PhoneNumber       string `json:"phoneNumber,omitempty"`
+	RoomCondition     string `json:"RoomCondition,omitempty"`
+	RoomOccupied      bool   `json:"RoomOccupied,omitempty"`
+}
+
+type HospitalityProvider interface {
+	GetRooms() ([]Room, error)
+	UpdateRoom(Room) error
 }

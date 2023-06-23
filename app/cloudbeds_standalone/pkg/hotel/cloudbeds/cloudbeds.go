@@ -1,16 +1,33 @@
 package cloudbeds
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/olegromanchuk/hotelito/pkg/secrets"
+	"github.com/olegromanchuk/hotelito/pkg/secrets/boltstore"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"io"
 	"net/http"
 	"os"
-	"pkg/models"
 	"strings"
 )
+
+type Room struct {
+	RoomID            string `json:"roomID"`
+	RoomName          string `json:"roomName"`
+	RoomDescription   string `json:"roomDescription"`
+	MaxGuests         int32  `json:"maxGuests"`
+	IsPrivate         bool   `json:"isPrivate"`
+	RoomBlocked       bool   `json:"roomBlocked"`
+	RoomTypeID        int32  `json:"roomTypeID"`
+	RoomTypeName      string `json:"roomTypeName"`
+	RoomTypeNameShort string `json:"roomTypeNameShort"`
+	PhoneNumber       string `json:"phoneNumber,omitempty"`
+	RoomCondition     string `json:"RoomCondition,omitempty"`
+	RoomOccupied      bool   `json:"RoomOccupied,omitempty"`
+}
 
 const (
 	oauthStateString = "random"
@@ -23,8 +40,6 @@ var (
 
 type Cloudbeds struct {
 }
-
-type Room models.Room
 
 type ResponseGetRooms struct {
 	Success bool `json:"success"`
@@ -88,27 +103,13 @@ func (r *Room) SearchRoomIDByPhoneNumber(phoneNumber string) (string, error) {
 	return roomID, nil
 }
 
-func handleLogin(w http.ResponseWriter, r *http.Request) {
+func (p *Cloudbeds) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	setOauth2Config()
 	url := oauthConf.AuthCodeURL(oauthStateString)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
-func setOauth2Config() {
-	scopes := strings.Split(os.Getenv("SCOPES"), ",")
-	oauthConf = &oauth2.Config{
-		ClientID:     os.Getenv("CLIENT_ID"),
-		ClientSecret: os.Getenv("CLIENT_SECRET"),
-		RedirectURL:  os.Getenv("REDIRECT_URL"),
-		Scopes:       scopes,
-		Endpoint: oauth2.Endpoint{
-			AuthURL:  os.Getenv("AUTH_URL"),
-			TokenURL: os.Getenv("TOKEN_URL"),
-		},
-	}
-}
-
-func handleCallback(w http.ResponseWriter, r *http.Request) {
+func (p *Cloudbeds) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	state := r.FormValue("state")
 	if state != oauthStateString {
 		fmt.Printf("invalid oauth state, expected '%s', got '%s'\n", oauthStateString, state)
@@ -144,6 +145,41 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 
 func New(logMain *logrus.Logger) *Cloudbeds {
 	log = logMain
-	//get access token
+
+	cloudbedsClient := &Cloudbeds{}
+
+	//get access_token
+
+	//current secret store - boltDB
+	boltDb, err := boltstore.New()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer boltDb.Db.Close()
+
+	var store secrets.SecretsStore
+	store = boltDb
+
+	accessToken, err := store.RetrieveAccessToken()
+	if err != nil {
+		cloudbedsClient.Login()
+	}
+	os.Setenv("CLOUDBEDS_ACCESS_TOKEN", accessToken)
+
+	//check if access_token is valid. If not - get refresh_token and update access_token
 	return &Cloudbeds{}
+}
+
+func setOauth2Config() {
+	scopes := strings.Split(os.Getenv("CLOUDBEDS_SCOPES"), ",")
+	oauthConf = &oauth2.Config{
+		ClientID:     os.Getenv("CLOUDBEDS_CLIENT_ID"),
+		ClientSecret: os.Getenv("CLOUDBEDS_CLIENT_SECRET"),
+		RedirectURL:  os.Getenv("CLOUDBEDS_REDIRECT_URL"),
+		Scopes:       scopes,
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  os.Getenv("CLOUDBEDS_AUTH_URL"),
+			TokenURL: os.Getenv("CLOUDBEDS_TOKEN_URL"),
+		},
+	}
 }
