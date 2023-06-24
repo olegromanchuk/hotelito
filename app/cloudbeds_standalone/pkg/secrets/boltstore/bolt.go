@@ -3,13 +3,8 @@ package boltstore
 import bolt "go.etcd.io/bbolt"
 
 const (
-	dbFile       = "secrets.db"
-	accessToken  = "access_token"
-	defaultToken = "" // Default token value when key is not found in the DB
-)
-
-var (
-	db *bolt.DB
+	dbFile     = "secrets.db"
+	bucketName = "cloudbeds_creds"
 )
 
 type BoltDBStore struct {
@@ -17,13 +12,29 @@ type BoltDBStore struct {
 }
 
 func (s *BoltDBStore) StoreAccessToken(token string) error {
-	return db.Update(func(tx *bolt.Tx) error {
-		bucket, err := tx.CreateBucketIfNotExists([]byte(accessToken))
+	return s.Db.Update(func(tx *bolt.Tx) error {
+		bucket, err := tx.CreateBucketIfNotExists([]byte(bucketName))
 		if err != nil {
 			return err
 		}
 
-		err = bucket.Put([]byte(accessToken), []byte(token))
+		err = bucket.Put([]byte("access_token"), []byte(token))
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+
+func (s *BoltDBStore) StoreRefreshToken(token string) error {
+	return s.Db.Update(func(tx *bolt.Tx) error {
+		bucket, err := tx.CreateBucketIfNotExists([]byte(bucketName))
+		if err != nil {
+			return err
+		}
+
+		err = bucket.Put([]byte("refresh_token"), []byte(token))
 		if err != nil {
 			return err
 		}
@@ -34,13 +45,13 @@ func (s *BoltDBStore) StoreAccessToken(token string) error {
 
 func (s *BoltDBStore) RetrieveAccessToken() (string, error) {
 	var token string
-	err := db.View(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket([]byte(accessToken))
+	err := s.Db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte(bucketName))
 		if bucket == nil {
 			return nil
 		}
 
-		tokenBytes := bucket.Get([]byte(accessToken))
+		tokenBytes := bucket.Get([]byte("access_token"))
 		if tokenBytes == nil {
 			return nil
 		}
@@ -53,17 +64,37 @@ func (s *BoltDBStore) RetrieveAccessToken() (string, error) {
 		return "", err
 	}
 
-	if token == "" {
-		return defaultToken, nil
+	return token, nil
+}
+
+func (s *BoltDBStore) RetrieveRefreshToken() (string, error) {
+	var token string
+	err := s.Db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte(bucketName))
+		if bucket == nil {
+			return nil
+		}
+
+		tokenBytes := bucket.Get([]byte("refresh_token"))
+		if tokenBytes == nil {
+			return nil
+		}
+
+		token = string(tokenBytes)
+		return nil
+	})
+
+	if err != nil {
+		return "", err
 	}
 
 	return token, nil
 }
 
 func New() (*BoltDBStore, error) {
-	db, err := bolt.Open(dbFile, 0600, nil)
+	dbref, err := bolt.Open(dbFile, 0600, nil)
 	if err != nil {
 		return nil, err
 	}
-	return &BoltDBStore{db: db}, nil
+	return &BoltDBStore{Db: dbref}, nil
 }

@@ -78,5 +78,14 @@ type Room struct {
 
 type HospitalityProvider interface {
 	GetRooms() ([]Room, error)
-	UpdateRoom(Room) error
+	GetRoom(roomNumber string) (Room, error)
+	UpdateRoom(roomNumber, housekeepingStatus, housekeeperID string) (msg string, err error)
 }
+
+type DetailedError struct {
+	Msg               error
+	StatusCodeMessage string
+	Details           string
+}
+
+func (e *DetailedError) Error() string { return e.Msg.Error() }

@@ -6,49 +6,50 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
+	"github.com/olegromanchuk/hotelito/pkg/hotel"
 	"github.com/olegromanchuk/hotelito/pkg/hotel/cloudbeds"
+	"github.com/olegromanchuk/hotelito/pkg/pbx"
+	"github.com/olegromanchuk/hotelito/pkg/pbx/pbx3cx"
 	"github.com/sirupsen/logrus"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 )
 
-const ()
-
 var (
-	//oauthConf = &oauth2.Config{
-	//	ClientID:     "improcom_LuPCZYx8TKrtyq72035DMXjS",
-	//	ClientSecret: "PoUAGK5bYMSvBCE1y7Zm9eODfwi6zkXH",
-	//	RedirectURL:  "https://bae1-72-89-122-10.ngrok-free.app/callback",
-	//	Scopes:       []string{"read:hotel", "read:reservation", "write:reservation", "read:room", "write:room", "read:housekeeping", "write:housekeeping"},
-	//	Endpoint: oauth2.Endpoint{
-	//		AuthURL:  "https://hotels.cloudbeds.com/api/v1.1/oauth",
-	//		TokenURL: "https://hotels.cloudbeds.com/api/v1.1/access_token",
-	//	},
-	//}
-
-	log = logrus.New()
+	log          = logrus.New()
+	clbClient    *cloudbeds.Cloudbeds
+	pbx3cxClient *pbx3cx.PBX3CX
 )
 
-type UpdateRoomConditionRequest struct {
-	RoomID        string `json:"roomID"`
-	RoomCondition string `json:"roomCondition"`
-	PropertyID    int    `json:"propertyID,omitempty"`
-	DoNotDisturb  bool   `json:"doNotDisturb,omitempty"`
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("Received request: %s %s", r.Method, r.URL)
+		next.ServeHTTP(w, r)
+	})
 }
 
-/*
-Response: {
-    "success": false,
-    "message": "Parameter roomID is required"
+type callerHook struct{}
+
+func (hook *callerHook) Levels() []logrus.Level {
+	// Set levels on which the hook to be fired.
+	return logrus.AllLevels
 }
-*/
+
+func (hook *callerHook) Fire(entry *logrus.Entry) error {
+	// You can modify any field of the entry here,
+	// or use the entry to send logs to other places.
+	entry.Data["caller"] = entry.Caller
+	return nil
+}
 
 func main() {
 	// The default level is info.
 	log.SetLevel(logrus.DebugLevel)
+	//log.SetReportCaller(true)
+	//log.AddHook(&callerHook{})
 
 	// Set output of logs to Stdout
 	log.SetOutput(os.Stdout)
@@ -56,23 +57,32 @@ func main() {
 	readAuthVarsFromFile()
 
 	r := mux.NewRouter()
+	api := r.PathPrefix("/api/v1").Subrouter()
+	api.Use(loggingMiddleware)
 
 	//   ---------------------- Cloudbed parts ----------------------
 	//create cloudbeds client
-	clbClient := cloudbeds.New(log)
+	clbClient = cloudbeds.New(log)
+	defer clbClient.Close()
+
+	//create 3cx client
+	pbx3cxClient = pbx3cx.New(log)
+	defer clbClient.Close()
 
 	//auth urls
-	r.HandleFunc("/", handleMain).Methods("GET")
-	r.HandleFunc("/login", clbClient.HandleLogin).Methods("GET")
-	r.HandleFunc("/callback", clbClient.HandleCallback).Methods("GET")
+	api.HandleFunc("/", handleMain).Methods("GET")
+	api.HandleFunc("/login", clbClient.HandleLogin).Methods("GET")
+	api.HandleFunc("/callback", clbClient.HandleCallback).Methods("GET")
 
 	//test/troubleshooting urls
-	r.HandleFunc("/housekeepings/{roomPhoneNumber}/{housekeepingStatus}/{housekeeperID}", handleHousekeepingAssignment).Methods("GET")
+	//update housekeeping status
+	// test data: "544559-0", "clean"
+	api.HandleFunc("/housekeepings/{roomPhoneNumber}/{housekeepingStatus}/{housekeeperID}", handleSetHousekeepingStatus).Methods("POST")
 
 	//3cx call info receiver
-	r.HandleFunc("/3cx/callback/{callinfo3cx}", handle3cxCallInfo).Methods("POST")
+	api.HandleFunc("/3cx/outbound_call", handle3cxCallInfo).Methods("POST")
 
-	http.Handle("/", r)
+	http.Handle("/", api)
 
 	//http.HandleFunc("/", handleMain)
 	//http.HandleFunc("/login", handleLogin)
@@ -83,15 +93,37 @@ func main() {
 }
 
 func handle3cxCallInfo(w http.ResponseWriter, r *http.Request) {
-	data3cx := mux.Vars(r)
-	log.Debugf("received 3cx Call Info: ", data3cx)
+	var pbxClient pbx.PBXProvider
+	pbxClient = pbx3cxClient
+
+	decoder := json.NewDecoder(r.Body)
+	log.Debugf("Received 3cx call info")
+	room, err := pbxClient.ProcessPBXRequest(decoder)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	if room.PhoneNumber == "" {
+		log.Error("Room phone number is empty")
+		return
+	}
+	log.Debugf("Room phone number: %s", room.PhoneNumber)
+	//get provider
+	var hotelProvider hotel.HospitalityProvider
+	hotelProvider = clbClient
+	msg, err := hotelProvider.UpdateRoom(room.PhoneNumber, room.RoomCondition, room.HouskeeperID)
+	if err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(msg))
 }
 
-func handleHousekeepingAssignment(w http.ResponseWriter, r *http.Request) {
-	log.Info("handleHousekeepingAssignment")
-
-	//get client
-	client = getClient
+func handleSetHousekeepingStatus(w http.ResponseWriter, r *http.Request) {
+	log.Debugf("handleSetHousekeepingStatus")
 
 	// Get the housekeeping info from the URL
 	vars := mux.Vars(r)
@@ -99,21 +131,20 @@ func handleHousekeepingAssignment(w http.ResponseWriter, r *http.Request) {
 	housekeepingStatus := vars["housekeepingStatus"]
 	housekeeperID := vars["housekeeperID"]
 
-	room := &Room{}
-	room.PhoneNumber = roomPhoneNumber
-	roomID, err := room.SearchRoomIDByPhoneNumber(roomPhoneNumber)
+	//get provider
+	var hotelProvider hotel.HospitalityProvider
+
+	log.Debugf("roomPhoneNumber: %s, housekeepingStatus: %s, housekeeperID: %s", roomPhoneNumber, housekeepingStatus, housekeeperID)
+	hotelProvider = clbClient
+	msg, err := hotelProvider.UpdateRoom(roomPhoneNumber, housekeepingStatus, housekeeperID)
 	if err != nil {
 		log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
 		return
 	}
-	room.RoomID = roomID
-
-	// Update the room condition
-	postHousekeepingAssignment(room.RoomID, housekeepingStatus)
-
-	// Redirect to the main page
-	http.Redirect(w, r, "/", http.StatusSeeOther)
-
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(msg))
 }
 
 func handleMain(w http.ResponseWriter, r *http.Request) {
@@ -163,86 +194,13 @@ func callCloudbedsAPI(method, URL, data string) (int, string, error) {
 	defer resp.Body.Close()
 
 	// Read the response body
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return 0, "", err
 	}
 
 	// Return the status code, response body, and nil error
 	return resp.StatusCode, string(bodyBytes), nil
-}
-
-func postHousekeepingAssignment(client *http.Client, roomID string, roomCondition string) error {
-	apiUrl := "https://hotels.cloudbeds.com/api/v1.1/postHousekeepingStatus"
-	log.Infof("Posting housekeeping assignment for room %s with condition: %s", roomID, roomCondition)
-
-	reqBody := UpdateRoomConditionRequest{
-		RoomID:        roomID,
-		RoomCondition: roomCondition,
-	}
-
-	data := url.Values{
-		"roomID":        {reqBody.RoomID},
-		"roomCondition": {reqBody.RoomCondition},
-	}
-
-	log.Debugf("Sending POST data to %s: %s", apiUrl, data)
-
-	// Use the encoded form data to create the request body. client.Post() does not work, so we create separate request abd run client.Do(req)
-	req, err := http.NewRequest("POST", apiUrl, strings.NewReader(data.Encode()))
-	if err != nil {
-		log.Fatal(err)
-	}
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := client.Do(req)
-
-	var respBody UpdateRoomConditionResponse
-	if err != nil {
-		log.Fatalf("Request failed with: %s", err)
-	} else {
-		defer resp.Body.Close()
-		err = json.NewDecoder(resp.Body).Decode(&respBody)
-		if err != nil {
-			fmt.Println("Error:", err)
-			return err
-		}
-		if err != nil {
-			log.Fatalf("Failed to read response: %s", err)
-		}
-		if respBody.Message != "" {
-			log.Debugf("Response message: %s", respBody.Message)
-		}
-		// check if respBody.Data is set
-		if respBody.Data.RoomID != "" {
-			log.Debugf("Response data: %s", respBody.Data)
-		}
-		log.Debugf("HttpCode: %s", resp.Status)
-	}
-
-	if respBody.Success {
-		fmt.Println("Room status successfully updated.")
-	} else {
-		fmt.Printf("Failed to update room status: %s\n", respBody.Message)
-	}
-
-	return nil
-}
-
-func getRooms(client *http.Client) (allRooms ResponseGetRooms, err error) {
-	resp, err := client.Get("https://hotels.cloudbeds.com/api/v1.1/getRooms")
-	if err != nil {
-		log.Fatalf("Request failed with: %s", err)
-	} else {
-		defer resp.Body.Close()
-
-		err = json.NewDecoder(resp.Body).Decode(&allRooms)
-		if err != nil {
-			log.Fatalf("Failed to read response: %s", err)
-		}
-		log.Debugf("Response: %s", allRooms)
-		return allRooms, nil
-	}
-	return allRooms, nil
 }
 
 func readAuthVarsFromFile() {

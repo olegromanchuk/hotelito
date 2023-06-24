@@ -2,6 +2,14 @@ module github.com/olegromanchuk/hotelito
 
 go 1.19
 
+replace github.com/olegromanchuk/hotelito/pkg/hotel => ./pkg/hotel
+
+replace github.com/olegromanchuk/hotelito/pkg/pbx3cx => ./pkg/pbx/pbx3cx
+
+replace github.com/olegromanchuk/hotelito/pkg/pbx => ./pkg/pbx
+
+replace github.com/olegromanchuk/hotelito/pkg/secrets => ./pkg/secrets
+
 require (
 	github.com/gorilla/mux v1.8.0
 	github.com/joho/godotenv v1.5.1
@@ -9,10 +17,6 @@ require (
 	go.etcd.io/bbolt v1.3.7
 	golang.org/x/oauth2 v0.9.0
 )
-
-replace github.com/olegromanchuk/hotelito/pkg/hotel => ./pkg/hotel
-
-replace github.com/olegromanchuk/hotelito/pkg/secrets => ./pkg/secrets
 
 require (
 	github.com/golang/protobuf v1.5.2 // indirect
