@@ -44,13 +44,13 @@
         <Output Type="CompanyName" Passes="0" Value="[CompanyName]" />
         <Output Type="Email" Passes="0" Value="[Email]" />
         <Output Type="PhoneBusiness" Passes="0" Value="[PhoneBusiness]" />
-        <Output Type="ContactUrl" Passes="0" Value="http://terra.improcom.com:9443/api/v1/contacturl" />
+        <Output Type="ContactUrl" Passes="0" Value="https://bb77-72-89-122-10.ngrok-free.app/api/v1/contacturl" />
         <Output Type="EntityId" Passes="0" Value="[ContactID]" />
         <Output Type="EntityType" Passes="0" Value="Contacts" />
       </Outputs>
     </Scenario>
     <Scenario Id="LookupByEmail" Type="REST">
-      <Request Url="http://terra.improcom.com:9443/api/v1/lookupbyemail" MessagePasses="0" RequestEncoding="UrlEncoded" RequestType="Get" ResponseType="Json" />
+      <Request Url="https://bb77-72-89-122-10.ngrok-free.app/api/v1/lookupbyemail" MessagePasses="0" RequestEncoding="UrlEncoded" RequestType="Get" ResponseType="Json" />
       <Rules>
         <Rule Type="Any">contact.id</Rule>
       </Rules>
@@ -81,7 +81,7 @@
         <Output Type="CompanyName" Passes="0" Value="[CompanyName]" />
         <Output Type="Email" Passes="0" Value="[Email]" />
         <Output Type="PhoneBusiness" Passes="0" Value="[PhoneBusiness]" />
-        <Output Type="ContactUrl" Passes="0" Value="http://terra.improcom.com:9443/api/v1/contacturl" />
+        <Output Type="ContactUrl" Passes="0" Value="https://bb77-72-89-122-10.ngrok-free.app/api/v1/contacturl" />
         <Output Type="EntityId" Passes="0" Value="[ContactID]" />
         <Output Type="EntityType" Passes="0" Value="Contacts" />
       </Outputs>
@@ -126,7 +126,7 @@
       <Outputs Next="ReportCallNotanswered" AllowEmpty="true" />
     </Scenario>
     <Scenario Id="ReportCallNotanswered" Type="REST">
-      <Request SkipIf="[IIf([ReportCallEnabled]!=True||[EntityId]==&quot;&quot;,True,[IIf([CallType]!=Notanswered,True,False)])]" Url="http://terra.improcom.com:9443/api/v1/call" MessagePasses="0" RequestContentType="application/json" RequestEncoding="Json" RequestType="Post" ResponseType="Json">
+      <Request SkipIf="[IIf([ReportCallEnabled]!=True||[EntityId]==&quot;&quot;,True,[IIf([CallType]!=Notanswered,True,False)])]" Url="https://bb77-72-89-122-10.ngrok-free.app/api/v1/call" MessagePasses="0" RequestContentType="application/json" RequestEncoding="Json" RequestType="Post" ResponseType="Json">
         <PostValues Key="">
           <Value Key="phone" Passes="1" Type="String">[Number]</Value>
         </PostValues>
