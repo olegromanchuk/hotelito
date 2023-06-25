@@ -1,0 +1,145 @@
+package handlers
+
+import (
+	"encoding/json"
+	"fmt"
+	"github.com/gorilla/mux"
+	"github.com/olegromanchuk/hotelito/pkg/hotel"
+	"github.com/olegromanchuk/hotelito/pkg/hotel/cloudbeds"
+	"github.com/olegromanchuk/hotelito/pkg/pbx"
+	"github.com/sirupsen/logrus"
+	"net/http"
+)
+
+type Handler struct {
+	Log   *logrus.Logger
+	PBX   pbx.PBXProvider
+	Hotel hotel.HospitalityProvider
+}
+
+func NewHandler(log *logrus.Logger, pbx pbx.PBXProvider, hotel hotel.HospitalityProvider) *Handler {
+	return &Handler{
+		Log:   log,
+		PBX:   pbx,
+		Hotel: hotel,
+	}
+}
+
+func (h *Handler) HandleManualLogin(w http.ResponseWriter, r *http.Request) {
+	url, err := cloudbeds.HandleManualLogin()
+	if err != nil {
+		h.Log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+}
+
+func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
+	h.Log.Debugf("Handling callback")
+	state := r.FormValue("state")
+	code := r.FormValue("code")
+	err := h.Hotel.HandleCallback(state, code)
+	if err != nil {
+		h.Log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	h.Log.Debugf("Got auth code: %s state: %s", code, state)
+	h.Log.Infof("Ready for future requests")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(fmt.Sprintf("Great Success! Ready for future requests. You can close this window now.")))
+}
+
+func (h *Handler) Handle3cxCallInfo(w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+	//h.Log.Debugf("Received 3cx call info")
+	room, err := h.PBX.ProcessPBXRequest(decoder)
+	if err != nil {
+		if err.Error() == "incoming-call-ignoring" { //ignore incoming calls
+			return
+		}
+		h.Log.Error(err)
+		return
+	}
+	if room.PhoneNumber == "" {
+		h.Log.Error("Room phone number is empty")
+		return
+	}
+	h.Log.Debugf("Room phone number: %s", room.PhoneNumber)
+
+	//get provider
+	hotelProvider := h.Hotel
+	msg, err := hotelProvider.UpdateRoom(room.PhoneNumber, room.RoomCondition, room.HouskeeperID)
+	if err != nil {
+		h.Log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(msg))
+}
+
+func (h *Handler) Handle3cxLookup(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	number := query.Get("Number")
+
+	type Contact struct {
+		ID          int    `json:"id"`
+		FirstName   string `json:"firstname"`
+		Company     string `json:"company"`
+		MobilePhone string `json:"mobilephone"`
+	}
+	contact := Contact{
+		ID:          12345,
+		FirstName:   "testFirstName",
+		Company:     "testCompany",
+		MobilePhone: number,
+	}
+
+	returnStruct := struct {
+		Contact Contact `json:"contact"`
+	}{Contact: contact}
+
+	js, err := json.Marshal(returnStruct)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(js)
+
+}
+
+func (h *Handler) HandleSetHousekeepingStatus(w http.ResponseWriter, r *http.Request) {
+	h.Log.Debugf("HandleSetHousekeepingStatus")
+
+	// Get the housekeeping info from the URL
+	vars := mux.Vars(r)
+	roomPhoneNumber := vars["roomPhoneNumber"]
+	housekeepingStatus := vars["housekeepingStatus"]
+	housekeeperID := vars["housekeeperID"]
+
+	//get provider
+
+	h.Log.Debugf("roomPhoneNumber: %s, housekeepingStatus: %s, housekeeperID: %s", roomPhoneNumber, housekeepingStatus, housekeeperID)
+	hotelProvider := h.Hotel
+	msg, err := hotelProvider.UpdateRoom(roomPhoneNumber, housekeepingStatus, housekeeperID)
+	if err != nil {
+		h.Log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(msg))
+}
+
+func (h *Handler) HandleMain(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, `<a href="/login">Login with OAuth2 Provider</a>`)
+}
