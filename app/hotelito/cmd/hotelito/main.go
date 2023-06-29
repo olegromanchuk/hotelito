@@ -73,6 +73,7 @@ func main() {
 	//update housekeeping status
 	// test data: "544559-0", "clean"
 	api.HandleFunc("/housekeepings/{roomPhoneNumber}/{housekeepingStatus}/{housekeeperID}", h.HandleSetHousekeepingStatus).Methods("POST")
+	api.HandleFunc("/getRooms", h.HandleGetRooms).Methods("GET")
 
 	//3cx call info receiver
 	api.HandleFunc("/3cx/lookupbynumber", h.Handle3cxLookup).Methods("GET")
