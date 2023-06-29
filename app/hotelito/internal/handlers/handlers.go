@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/olegromanchuk/hotelito/pkg/hotel"
-	"github.com/olegromanchuk/hotelito/pkg/hotel/cloudbeds"
 	"github.com/olegromanchuk/hotelito/pkg/pbx"
 	"github.com/sirupsen/logrus"
 	"net/http"
@@ -26,7 +25,7 @@ func NewHandler(log *logrus.Logger, pbx pbx.PBXProvider, hotel hotel.Hospitality
 }
 
 func (h *Handler) HandleManualLogin(w http.ResponseWriter, r *http.Request) {
-	url, err := cloudbeds.HandleManualLogin()
+	url, err := h.Hotel.HandleManualLogin()
 	if err != nil {
 		h.Log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -136,6 +135,22 @@ func (h *Handler) HandleSetHousekeepingStatus(w http.ResponseWriter, r *http.Req
 		w.Write([]byte(err.Error()))
 		return
 	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(msg))
+}
+
+func (h *Handler) HandleGetRooms(w http.ResponseWriter, r *http.Request) {
+	h.Log.Debugf("HandleGetRooms")
+
+	hotelProvider := h.Hotel
+	rooms, err := hotelProvider.GetRooms()
+	if err != nil {
+		h.Log.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	msg := fmt.Sprintf("amount of rooms: %d", len(rooms))
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(msg))
 }

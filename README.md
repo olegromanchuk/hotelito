@@ -66,15 +66,15 @@ CLOUDBEDS_TOKEN_URL=https://hotels.cloudbeds.com/api/v1.1/access_token
 ```
 <Scenarios>
     <Scenario Id="" Type="REST">
-      <Request Url="https://bb77-72-89-122-10.ngrok-free.app/api/v1/lookupbynumber?Number=[Number]&amp;CallDirection=[CallDirection]" MessagePasses="0" RequestEncoding="UrlEncoded" RequestType="Get" ResponseType="Json" />
+      <Request Url="https://bb37-7232-283123 2-10.ngrok-free.app/api/v1/lookupbynumber?Number=[Number]&amp;CallDirection=[CallDirection]" MessagePasses="0" RequestEncoding="UrlEncoded" RequestType="Get" ResponseType="Json" />
 ```
 ```
  <Scenario Id="ReportCall" Type="REST">
-      <Request SkipIf="[IIf([ReportCallEnabled]!=True||[EntityId]==&quot;&quot;,True,[IIf([CallType]!=Inbound,True,False)])]" Url="https://bb77-72-89-122-10.ngrok-free.app/api/v1/3cx/outbound_call" MessagePasses="0" RequestContentType="application/json" RequestEncoding="Json" RequestType="Post" ResponseType="Json">
+      <Request SkipIf="[IIf([ReportCallEnabled]!=True||[EntityId]==&quot;&quot;,True,[IIf([CallType]!=Inbound,True,False)])]" Url="https://bb37-7232-283123 2-10.ngrok-free.app/api/v1/3cx/outbound_call" MessagePasses="0" RequestContentType="application/json" RequestEncoding="Json" RequestType="Post" ResponseType="Json">
 ```
 ```
  <Scenario Id="ReportCallOutbound" Type="REST">
-      <Request SkipIf="[IIf([ReportCallEnabled]!=True||[EntityId]==&quot;&quot;,True,[IIf([CallType]!=Outbound,True,False)])]" Url="https://bb77-72-89-122-10.ngrok-free.app/api/v1/3cx/outbound_call" MessagePasses="0" RequestContentType="application/json" RequestEncoding="Json" RequestType="Post" ResponseType="Json">
+      <Request SkipIf="[IIf([ReportCallEnabled]!=True||[EntityId]==&quot;&quot;,True,[IIf([CallType]!=Outbound,True,False)])]" Url="https://bb37-7232-283123 2-10.ngrok-free.app/api/v1/3cx/outbound_call" MessagePasses="0" RequestContentType="application/json" RequestEncoding="Json" RequestType="Post" ResponseType="Json">
 ```
 
 5. In 3CX admin interface under Settings->(Integrations) CRM click add and select crm-template-cloudbeds-3cx.xml.
