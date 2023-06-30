@@ -12,9 +12,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       MY_WORKDIR: ./app/hotelito
-    defaults:
-      run:
-        working-directory: ${{ env.MY_WORKDIR }}
 
     steps:
       - name: set up go 1.20
@@ -30,7 +27,7 @@ jobs:
         working-directory: ${{ env.MY_WORKDIR }}
         run: go get -v -t -d ./...
 
-      - name: build and test
+      - name: go test
         working-directory: ${{ env.MY_WORKDIR }}
         run: |
           go test -v -timeout=100s -covermode=count -coverprofile=profile.cov ./...
@@ -39,6 +36,7 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: latest
+          working-directory: ${{ env.MY_WORKDIR }}
 
     #   - name: install goveralls
     #     run: |
