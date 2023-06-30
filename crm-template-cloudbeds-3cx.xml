@@ -13,7 +13,7 @@
   <Authentication Type="No" />
   <Scenarios>
     <Scenario Id="" Type="REST">
-      <Request Url="https://bb77-72-89-122-10.ngrok-free.app/api/v1/3cx/lookupbynumber?Number=[Number]&amp;CallDirection=[CallDirection]" MessagePasses="0" RequestEncoding="UrlEncoded" RequestType="Get" ResponseType="Json" />
+      <Request Url="https://47d7-72-89-122-10.ngrok-free.app/api/v1/3cx/lookupbynumber?Number=[Number]&amp;CallDirection=[CallDirection]" MessagePasses="0" RequestEncoding="UrlEncoded" RequestType="Get" ResponseType="Json" />
       <Rules>
         <Rule Type="Any">contact.id</Rule>
       </Rules>
@@ -44,13 +44,13 @@
         <Output Type="CompanyName" Passes="0" Value="[CompanyName]" />
         <Output Type="Email" Passes="0" Value="[Email]" />
         <Output Type="PhoneBusiness" Passes="0" Value="[PhoneBusiness]" />
-        <Output Type="ContactUrl" Passes="0" Value="https://bb77-72-89-122-10.ngrok-free.app/api/v1/contacturl" />
+        <Output Type="ContactUrl" Passes="0" Value="https://notinuse.app/api/v1/contacturl" />
         <Output Type="EntityId" Passes="0" Value="[ContactID]" />
         <Output Type="EntityType" Passes="0" Value="Contacts" />
       </Outputs>
     </Scenario>
     <Scenario Id="LookupByEmail" Type="REST">
-      <Request Url="https://bb77-72-89-122-10.ngrok-free.app/api/v1/lookupbyemail" MessagePasses="0" RequestEncoding="UrlEncoded" RequestType="Get" ResponseType="Json" />
+      <Request Url="https://notinuse.app/api/v1/lookupbyemail" MessagePasses="0" RequestEncoding="UrlEncoded" RequestType="Get" ResponseType="Json" />
       <Rules>
         <Rule Type="Any">contact.id</Rule>
       </Rules>
@@ -81,13 +81,13 @@
         <Output Type="CompanyName" Passes="0" Value="[CompanyName]" />
         <Output Type="Email" Passes="0" Value="[Email]" />
         <Output Type="PhoneBusiness" Passes="0" Value="[PhoneBusiness]" />
-        <Output Type="ContactUrl" Passes="0" Value="https://bb77-72-89-122-10.ngrok-free.app/api/v1/contacturl" />
+        <Output Type="ContactUrl" Passes="0" Value="https://notinuse.app/api/v1/contacturl" />
         <Output Type="EntityId" Passes="0" Value="[ContactID]" />
         <Output Type="EntityType" Passes="0" Value="Contacts" />
       </Outputs>
     </Scenario>
     <Scenario Id="ReportCall" Type="REST">
-      <Request SkipIf="[IIf([ReportCallEnabled]!=True||[EntityId]==&quot;&quot;,True,[IIf([CallType]!=Inbound,True,False)])]" Url="https://bb77-72-89-122-10.ngrok-free.app/api/v1/3cx/outbound_call" MessagePasses="0" RequestContentType="application/json" RequestEncoding="Json" RequestType="Post" ResponseType="Json">
+      <Request SkipIf="[IIf([ReportCallEnabled]!=True||[EntityId]==&quot;&quot;,True,[IIf([CallType]!=Inbound,True,False)])]" Url="https://47d7-72-89-122-10.ngrok-free.app/api/v1/3cx/outbound_call" MessagePasses="0" RequestContentType="application/json" RequestEncoding="Json" RequestType="Post" ResponseType="Json">
         <PostValues Key="">
           <Value Key="Number" Passes="1" Type="String">[Number]</Value>
           <Value Key="CallType" Passes="1" Type="String">[CallType]</Value>
@@ -102,7 +102,7 @@
       <Outputs Next="ReportCallMissed" AllowEmpty="true" />
     </Scenario>
     <Scenario Id="ReportCallMissed" Type="REST">
-      <Request SkipIf="[IIf([ReportCallEnabled]!=True||[EntityId]==&quot;&quot;,True,[IIf([CallType]!=Missed,True,False)])]" Url="https://bb77-72-89-122-10.ngrok-free.app/api/v1/3cx/null" MessagePasses="0" RequestContentType="application/json" RequestEncoding="Json" RequestType="Post" ResponseType="Json">
+      <Request SkipIf="[IIf([ReportCallEnabled]!=True||[EntityId]==&quot;&quot;,True,[IIf([CallType]!=Missed,True,False)])]" Url="https://notinuse.app/api/v1/3cx/null" MessagePasses="0" RequestContentType="application/json" RequestEncoding="Json" RequestType="Post" ResponseType="Json">
         <PostValues Key="">
           <Value Key="phone" Passes="1" Type="String">[Number]</Value>
         </PostValues>
@@ -111,7 +111,7 @@
       <Outputs Next="ReportCallOutbound" AllowEmpty="true" />
     </Scenario>
     <Scenario Id="ReportCallOutbound" Type="REST">
-      <Request SkipIf="[IIf([ReportCallEnabled]!=True||[EntityId]==&quot;&quot;,True,[IIf([CallType]!=Outbound,True,False)])]" Url="https://bb77-72-89-122-10.ngrok-free.app/api/v1/3cx/outbound_call" MessagePasses="0" RequestContentType="application/json" RequestEncoding="Json" RequestType="Post" ResponseType="Json">
+      <Request SkipIf="[IIf([ReportCallEnabled]!=True||[EntityId]==&quot;&quot;,True,[IIf([CallType]!=Outbound,True,False)])]" Url="https://47d7-72-89-122-10.ngrok-free.app/api/v1/3cx/outbound_call" MessagePasses="0" RequestContentType="application/json" RequestEncoding="Json" RequestType="Post" ResponseType="Json">
         <PostValues Key="">
           <Value Key="Number" Passes="1" Type="String">[Number]</Value>
           <Value Key="CallType" Passes="1" Type="String">[CallType]</Value>
@@ -126,7 +126,7 @@
       <Outputs Next="ReportCallNotanswered" AllowEmpty="true" />
     </Scenario>
     <Scenario Id="ReportCallNotanswered" Type="REST">
-      <Request SkipIf="[IIf([ReportCallEnabled]!=True||[EntityId]==&quot;&quot;,True,[IIf([CallType]!=Notanswered,True,False)])]" Url="https://bb77-72-89-122-10.ngrok-free.app/api/v1/call" MessagePasses="0" RequestContentType="application/json" RequestEncoding="Json" RequestType="Post" ResponseType="Json">
+      <Request SkipIf="[IIf([ReportCallEnabled]!=True||[EntityId]==&quot;&quot;,True,[IIf([CallType]!=Notanswered,True,False)])]" Url="https://47d7-72-89-122-10.ngrok-free.app/api/v1/call" MessagePasses="0" RequestContentType="application/json" RequestEncoding="Json" RequestType="Post" ResponseType="Json">
         <PostValues Key="">
           <Value Key="phone" Passes="1" Type="String">[Number]</Value>
         </PostValues>
