@@ -10,6 +10,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      MY_WORKDIR: ./app/hotelito
 
     steps:
       - name: set up go 1.20
@@ -22,9 +24,11 @@ jobs:
         uses: actions/checkout@v3
       
       - name: Get dependencies
+        working-directory: ${{ env.MY_WORKDIR }}
         run: go get -v -t -d ./...
 
       - name: build and test
+        working-directory: ${{ env.MY_WORKDIR }}
         run: |
           go test -v -timeout=100s -covermode=count -coverprofile=profile.cov ./...
 
@@ -41,7 +45,7 @@ jobs:
       - name: Coveralls
         uses: shogo82148/actions-goveralls@v1.7.0
         with:
-            path-to-profile: profile.cov
+            path-to-profile: ${{ env.MY_WORKDIR }}/profile.cov
             parallel: true
 
       # - name: submit coverage
