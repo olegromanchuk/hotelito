@@ -43,11 +43,12 @@ jobs:
     #       curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s -- -b $GITHUB_WORKSPACE v1.45.0
     #       GO111MODULE=off go get -u -v github.com/mattn/goveralls
 
-      - name: Coveralls
+      - name: submit coverage to Coveralls
         uses: shogo82148/actions-goveralls@v1.7.0
         with:
             path-to-profile: ${{ env.MY_WORKDIR }}/profile.cov
             parallel: true
+            working-directory: ${{ env.MY_WORKDIR }}
 
       # - name: submit coverage
       #   run: $(go env GOPATH)/bin/goveralls -service="github" -coverprofile=$GITHUB_WORKSPACE/profile.cov
