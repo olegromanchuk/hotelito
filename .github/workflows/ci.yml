@@ -46,7 +46,7 @@ jobs:
       - name: submit coverage to Coveralls
         uses: shogo82148/actions-goveralls@v1.7.0
         with:
-            path-to-profile: ${{ env.MY_WORKDIR }}/profile.cov
+            path-to-profile: profile.cov
             parallel: true
             working-directory: ${{ env.MY_WORKDIR }}
 
