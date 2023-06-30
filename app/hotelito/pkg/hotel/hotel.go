@@ -81,6 +81,7 @@ type HospitalityProvider interface {
 	GetRoom(roomNumber string) (Room, error)
 	UpdateRoom(roomNumber, housekeepingStatus, housekeeperID string) (msg string, err error)
 	HandleCallback(state, code string) (err error)
+	HandleManualLogin() (url string, err error)
 }
 
 type DetailedError struct {

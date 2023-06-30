@@ -5,4 +5,5 @@ type SecretsStore interface {
 	StoreRefreshToken(token string) error
 	RetrieveAccessToken() (string, error)
 	RetrieveRefreshToken() (string, error)
+	Close() error
 }

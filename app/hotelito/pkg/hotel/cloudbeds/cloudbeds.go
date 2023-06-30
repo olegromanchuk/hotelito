@@ -3,6 +3,7 @@ package cloudbeds
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/olegromanchuk/hotelito/pkg/hotel"
 	"github.com/olegromanchuk/hotelito/pkg/secrets"
@@ -37,13 +38,26 @@ const (
 
 var (
 	oauthConf                  *oauth2.Config
-	log                        *logrus.Logger
 	loginLoopPreventionCounter = 1
 )
 
+// HTTPClient is needed for mocking http requests in tests. This is the only reason to create this interface. Original http.Client implements this interface
+type HTTPClient interface {
+	Get(url string) (*http.Response, error)
+	Do(req *http.Request) (*http.Response, error)
+}
+
+// Cloudbeds is used to make requests to Cloudbeds API. httpClient contains pre-authorized http.Client that is set by the package oauth2 during authorization process. In tests we just mock this client to imitate cloudbeds API responses.
 type Cloudbeds struct {
-	httpClient  *http.Client
+	httpClient  HTTPClient
 	storeClient secrets.SecretsStore
+	log         *logrus.Logger
+	refresher   TokenRefresher
+}
+
+// TokenRefresher is needed for mocking http requests in tests. This is the only reason to create this interface. Cloudbeds implements this interface
+type TokenRefresher interface {
+	refreshToken() error
 }
 
 type UpdateRoomConditionRequest struct {
@@ -99,11 +113,11 @@ func (r Room) ToHotelRoom() hotel.Room {
 }
 
 func (p *Cloudbeds) GetRooms() (rooms []hotel.Room, err error) {
-	log.Debugf("getting rooms")
+	p.log.Debugf("getting rooms")
 	respBody := &ResponseGetRooms{}
 	resp, err := p.httpClient.Get("https://hotels.cloudbeds.com/api/v1.1/getRooms")
 	if err != nil {
-		log.Errorf("request failed with: %s", err)
+		p.log.Errorf("request failed with: %s", err)
 		return rooms, fmt.Errorf("request failed with: %s", err)
 	}
 	defer resp.Body.Close()
@@ -111,24 +125,37 @@ func (p *Cloudbeds) GetRooms() (rooms []hotel.Room, err error) {
 	err = json.NewDecoder(resp.Body).Decode(&respBody)
 	if err != nil {
 		detailedError := &hotel.DetailedError{Msg: err, Details: fmt.Sprintf("success, but parse return body: %s", err)}
-		log.Debugf("success, but parse return body: %s", err)
+		p.log.Debugf("success, but parse return body: %s", err)
 		return rooms, detailedError
+	}
+
+	//check for errors
+	if !respBody.Success { //might be access_token expired. Try to refresh it
+		p.log.Debugf("Failed to update room status: %s Might be access_token expired", respBody.Message)
+		err = p.refresher.refreshToken()
+		if err != nil {
+			p.log.Debugf("Failed to update room status: %s", respBody.Message)
+			return rooms, err
+		}
+		rooms, err = p.GetRooms()
+		if err != nil { //might be access_token expired. Try to refresh it
+			p.log.Debugf("Failed to update room status after token refresh: %s", respBody.Message)
+			return rooms, err
+		} else {
+			return rooms, nil
+		}
 	}
 
 	// check if respBody.Data is set
 	if len(respBody.Data) == 0 {
 		detailedError := &hotel.DetailedError{Msg: err, Details: fmt.Sprintf("success, but no rooms found: %s", err)}
-		log.Debugf("success, but no rooms found: %s", respBody.Data)
+		p.log.Debugf("success, but no rooms found: %v", respBody.Data)
 		return rooms, detailedError
 	}
-	log.Debugf("Response data: %s", respBody.Data)
-	log.Debugf("HttpCode: %s", resp.Status)
+	p.log.Debugf("Response data: %v", respBody.Data)
+	p.log.Debugf("HttpCode: %s", resp.Status)
 
-	if !respBody.Success {
-		log.Errorf("Failed to get rooms info: %s\n", respBody.Message)
-	}
-
-	log.Debugf("Amount of rooms: %s", len(respBody.Data[0].Rooms))
+	p.log.Debugf("Amount of rooms: %d", len(respBody.Data[0].Rooms))
 
 	for _, room := range respBody.Data[0].Rooms {
 		rooms = append(rooms, room.ToHotelRoom())
@@ -148,14 +175,14 @@ func (p *Cloudbeds) CancelReservation(reservationID string) error {
 }
 
 func (p *Cloudbeds) UpdateRoom(roomNumber, housekeepingStatus, housekeeperID string) (msg string, err error) {
-	log.Debugf("Start UpdateRoom %s to %s", roomNumber, housekeepingStatus)
+	p.log.Debugf("Start UpdateRoom %s to %s", roomNumber, housekeepingStatus)
 
 	//get room id
 	room := &Room{}
 	room.PhoneNumber = roomNumber
-	roomID, err := room.SearchRoomIDByPhoneNumber(roomNumber)
+	roomID, err := room.SearchRoomIDByPhoneNumber(roomNumber, os.Getenv("CLOUDBEDS_PHONE2ROOM_MAP_FILENAME"))
 	if err != nil {
-		log.Error(err)
+		p.log.Error(err)
 		return msg, err
 	}
 	room.RoomID = roomID
@@ -163,23 +190,23 @@ func (p *Cloudbeds) UpdateRoom(roomNumber, housekeepingStatus, housekeeperID str
 	// Update the room condition
 	err = p.postHousekeepingStatus(room.RoomID, housekeepingStatus)
 	if err != nil {
-		log.Error(err)
+		p.log.Error(err)
 		return msg, err
 	}
 	msg = fmt.Sprintf("Finish UpdateRoom successfully updated room %s to %s", roomNumber, housekeepingStatus)
-	log.Debugf(msg)
+	p.log.Debugf(msg)
 	return msg, nil
 }
 
 func (p *Cloudbeds) GetRoom(roomNumber string) (hotel.Room, error) {
-	log.Infof("get info about room %s", roomNumber)
+	p.log.Infof("get info about room %s", roomNumber)
 
 	//get room id
 	room := &Room{}
 	room.PhoneNumber = roomNumber
-	roomID, err := room.SearchRoomIDByPhoneNumber(roomNumber)
+	roomID, err := room.SearchRoomIDByPhoneNumber(roomNumber, os.Getenv("CLOUDBEDS_PHONE2ROOM_MAP_FILENAME"))
 	if err != nil {
-		log.Error(err)
+		p.log.Error(err)
 		return room.ToHotelRoom(), err
 	}
 	room.RoomID = roomID
@@ -188,8 +215,8 @@ func (p *Cloudbeds) GetRoom(roomNumber string) (hotel.Room, error) {
 }
 
 // handleLogin helper function to handle login. Just redirect to oauth2 provider login page
-func HandleManualLogin() (url string, err error) {
-	setOauth2Config()
+func (p *Cloudbeds) HandleManualLogin() (url string, err error) {
+	p.setOauth2Config()
 	url = oauthConf.AuthCodeURL(oauthStateString)
 	if url == "" {
 		return url, fmt.Errorf("failed to retrieve oauth2 url. Check .env file and make sure that all variables related to CLOUDBEDS are set. Refer to .env_example")
@@ -198,23 +225,23 @@ func HandleManualLogin() (url string, err error) {
 }
 
 func (p *Cloudbeds) login(secretStore secrets.SecretsStore) (statusCodeMsg string, msg string) {
-	log.Debugf("Trying to login to Cloudbeds")
+	p.log.Debugf("Trying to login to Cloudbeds")
 	if loginLoopPreventionCounter > 1 {
-		log.Debugf("Running login in a loop %d time", loginLoopPreventionCounter)
+		p.log.Debugf("Running login in a loop %d time", loginLoopPreventionCounter)
 	}
 
 	// try to retrieve refresh token from secret store
-	log.Debugf("Trying to retrieve refresh token from secret store")
+	p.log.Debugf("Trying to retrieve refresh token from secret store")
 	refreshToken, err := secretStore.RetrieveRefreshToken()
 	if err != nil {
-		log.Fatalf("failed to retrieve refresh token from secret store: %v", err)
+		p.log.Fatalf("failed to retrieve refresh token from secret store: %v", err)
 	}
 
 	if refreshToken == "" {
 		//call oauth2 login
-		setOauth2Config()
+		p.setOauth2Config()
 		msg = fmt.Sprintln("No refresh token found. Please run this link in browser to login to Cloudbeds: ", oauthConf.AuthCodeURL(oauthStateString))
-		return fmt.Sprintf("no-refresh-token-found"), msg
+		return "no-refresh-token-found", msg
 	}
 
 	// get new access token via refresh token
@@ -226,29 +253,33 @@ func (p *Cloudbeds) login(secretStore secrets.SecretsStore) (statusCodeMsg strin
 	tokenSource := oauthConf.TokenSource(context.Background(), token)
 	newToken, err := tokenSource.Token()
 	if err != nil {
-		log.Info("failed to get new access token. Looks like refresh token is stale. Clearing it and try to login again")
-		secretStore.StoreRefreshToken("")
+		p.log.Info("failed to get new access token. Looks like refresh token is stale. Clearing it and try to login again")
+		err := secretStore.StoreRefreshToken("")
+		if err != nil {
+			p.log.Fatalf("failed to clear refresh token from secret store: %v", err)
+			return "", ""
+		}
 		loginLoopPreventionCounter++
 		if loginLoopPreventionCounter <= 2 {
 			statusRefresh, msgStatus := p.login(secretStore)
 			return statusRefresh, msgStatus
 		}
-		log.Debugf("Login loop prevention counter: %d", loginLoopPreventionCounter)
-		return fmt.Sprintln("failed-to-get-refresh-token"), fmt.Sprintf("failed to get new access token")
+		p.log.Debugf("Login loop prevention counter: %d", loginLoopPreventionCounter)
+		return fmt.Sprintln("failed-to-get-refresh-token"), "failed to get new access token"
 	}
-	log.Debugf("Issued new access token with len: %v", len(newToken.AccessToken))
+	p.log.Debugf("Issued new access token with len: %v", len(newToken.AccessToken))
 	return "ok", ""
 }
 
 func (p *Cloudbeds) refreshToken() error {
-	log.Debugf("Trying to refresh token")
+	p.log.Debugf("Trying to refresh token")
 
 	//call oauth2 data
-	setOauth2Config()
+	p.setOauth2Config()
 
 	refreshToken, err := p.storeClient.RetrieveRefreshToken()
 	if err != nil {
-		log.Fatalf("failed to retrieve refresh token from secret store: %v", err)
+		p.log.Fatalf("failed to retrieve refresh token from secret store: %v", err)
 	}
 
 	// Make client request using the obtained token
@@ -259,95 +290,57 @@ func (p *Cloudbeds) refreshToken() error {
 	tokenSource := oauthConf.TokenSource(context.Background(), token)
 	newToken, err := tokenSource.Token()
 	if err != nil {
-		log.Info("failed to get new access token. Looks like refresh token is stale. Clearing it and try to login again")
+		p.log.Info("failed to get new access token. Looks like refresh token is stale. Clearing it and try to login again")
 	}
 
 	p.httpClient = oauthConf.Client(context.Background(), token)
-	p.storeClient.StoreAccessToken(newToken.AccessToken)
+	err = p.storeClient.StoreAccessToken(newToken.AccessToken)
+	if err != nil {
+		return err
+	}
 
-	log.Debugf("Issued new access token with len: %d", len(newToken.AccessToken))
+	p.log.Debugf("Issued new access token with len: %d", len(newToken.AccessToken))
 	return nil
 }
 
-//func (p *Cloudbeds) HandleCallback(w http.ResponseWriter, r *http.Request) {
-//	log.Debugf("Handling callback")
-//	state := r.FormValue("state")
-//	if state != oauthStateString {
-//		log.Error("invalid oauth state, expected '%s', got '%s'\n", oauthStateString, state)
-//		w.WriteHeader(http.StatusUnauthorized)
-//		w.Write([]byte(fmt.Sprintf("invalid oauth state, expected '%s', got '%s'\n", oauthStateString, state)))
-//		//http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
-//		return
-//	}
-//
-//	code := r.FormValue("code")
-//	log.Debugf("Got auth code: %s", code)
-//	token, err := oauthConf.Exchange(context.Background(), code)
-//	if err != nil {
-//		log.Error("oauthConf.Exchange() failed with '%s'\n", err)
-//		w.WriteHeader(http.StatusUnauthorized)
-//		w.Write([]byte(fmt.Sprintf("oauthConf.Exchange() failed with '%s'\n", err)))
-//		//http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
-//		return
-//	}
-//	log.Debugf("Got access token of length: %d", len(token.AccessToken))
-//
-//	// get pre-authorized client for future requests
-//	p.httpClient = oauthConf.Client(context.Background(), token)
-//
-//	//save access and refresh token to secret store
-//	log.Debugf("Saving access token to secret store")
-//	err = p.storeClient.StoreAccessToken(token.AccessToken)
-//	if err != nil {
-//		log.Error(err)
-//	}
-//	log.Debugf("Saving refresh token to secret store")
-//	err = p.storeClient.StoreRefreshToken(token.RefreshToken)
-//	if err != nil {
-//		log.Error(err)
-//	}
-//
-//	log.Infof("Ready for future requests")
-//	w.WriteHeader(http.StatusOK)
-//	w.Write([]byte(fmt.Sprintf("Great Success! Ready for future requests. You can close this window now.")))
-//
-//}
-
 func (p *Cloudbeds) HandleCallback(state, code string) (err error) {
-	log.Debugf("Handling callback in cloudbeds")
+	p.log.Debugf("Handling callback in cloudbeds")
 	if state != oauthStateString {
-		log.Error("invalid oauth state, expected '%s', got '%s'\n", oauthStateString, state)
+		p.log.Errorf("invalid oauth state, expected '%s', got '%s'", oauthStateString, state)
 		return fmt.Errorf("invalid oauth state, expected '%s', got '%s'\n", oauthStateString, state)
 	}
 
 	token, err := oauthConf.Exchange(context.Background(), code)
 	if err != nil {
-		log.Debugf("oauthConf.Exchange() failed with '%s'", err)
+		p.log.Debugf("oauthConf.Exchange() failed with '%s'", err)
 		return fmt.Errorf("oauthConf.Exchange() failed with '%s'\n", err)
 	}
-	log.Debugf("Got access token of length: %d", len(token.AccessToken))
+	p.log.Debugf("Got access token of length: %d", len(token.AccessToken))
 
 	// get pre-authorized client for future requests
 	p.httpClient = oauthConf.Client(context.Background(), token)
 
 	//save access and refresh token to secret store
-	log.Debugf("Saving access token to secret store")
+	p.log.Debugf("Saving access token to secret store")
 	err = p.storeClient.StoreAccessToken(token.AccessToken)
 	if err != nil {
-		log.Error(err)
+		p.log.Error(err)
 	}
-	log.Debugf("Saving refresh token to secret store")
+	p.log.Debugf("Saving refresh token to secret store")
 	err = p.storeClient.StoreRefreshToken(token.RefreshToken)
 	if err != nil {
-		log.Error(err)
+		p.log.Error(err)
 	}
 	return nil
 }
 
-func New(logMain *logrus.Logger) *Cloudbeds {
-	log = logMain
+func New(log *logrus.Logger) *Cloudbeds {
 	log.Debugf("Creating new Cloudbeds client")
-	cloudbedsClient := &Cloudbeds{}
+	cloudbedsClient := &Cloudbeds{
+		log: log,
+	}
+	cloudbedsClient.refresher = cloudbedsClient //refresher is an interface! This feint with ears is needed to point refreshToken method to itself. Now call p.refresher.refreshToken() will call refreshToken method of Cloudbeds struct
+	//refresher was created as interface to make the code more testable
 
 	//get access_token
 
@@ -377,16 +370,16 @@ func New(logMain *logrus.Logger) *Cloudbeds {
 }
 
 func (p *Cloudbeds) Close() error {
-	err := p.Close()
+	err := p.storeClient.Close()
 	if err != nil {
-		log.Error(err)
+		p.log.Error(err)
 	}
 	return nil
 }
 
 func (p *Cloudbeds) postHousekeepingStatus(roomID string, roomCondition string) (errorStatusCodeMsg error) {
 	apiUrl := "https://hotels.cloudbeds.com/api/v1.1/postHousekeepingStatus"
-	log.Infof("Posting housekeeping assignment for room %s with condition: %s", roomID, roomCondition)
+	p.log.Infof("Posting housekeeping assignment for room %s with condition: %s", roomID, roomCondition)
 
 	reqBody := UpdateRoomConditionRequest{
 		RoomID:        roomID,
@@ -398,42 +391,44 @@ func (p *Cloudbeds) postHousekeepingStatus(roomID string, roomCondition string) 
 		"roomCondition": {reqBody.RoomCondition},
 	}
 
-	log.Debugf("Sending POST data to %s: %v", apiUrl, data)
+	p.log.Debugf("Sending POST data to %s: %v", apiUrl, data)
 
 	// Use the encoded form data to create the request body. client.Post() does not work, so we create a separate request and run client.Do(req)
 	req, err := http.NewRequest("POST", apiUrl, strings.NewReader(data.Encode()))
 	if err != nil {
-		log.Fatal(err)
+		p.log.Fatal(err)
 	}
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := p.httpClient.Do(req)
-
-	var respBody UpdateRoomConditionResponse
 	if err != nil {
 		detailedError := &hotel.DetailedError{Msg: err, Details: fmt.Sprintf("update room status failed with: %s", err)}
-		log.Debugf("update room status failed with: %s", err)
+		p.log.Debugf("update room status failed with: %s", err)
 		return detailedError
 	}
 	defer resp.Body.Close()
+
+	var respBody UpdateRoomConditionResponse
 	err = json.NewDecoder(resp.Body).Decode(&respBody)
 	if err != nil {
 		detailedError := &hotel.DetailedError{Msg: err, Details: fmt.Sprintf("success, but parse return body: %s", err)}
-		log.Debugf("success, but parse return body: %s", err)
+		p.log.Debugf("success, but parse return body: %s", err)
 		return detailedError
 	}
 
 	//check for errors
 	if !respBody.Success { //might be access_token expired. Try to refresh it
-		log.Debugf("Failed to update room status: %s Might be access_token expired", respBody.Message)
-		err = p.refreshToken()
+		p.log.Debugf("Failed to update room status: %s Might be access_token expired", respBody.Message)
+		err = p.refresher.refreshToken()
 		if err != nil {
-			log.Debugf("Failed to update room status: %s", respBody.Message)
-			return err
+			errMsg := fmt.Sprintf("Failed to update room status: %s", err.Error())
+			p.log.Debugf(errMsg)
+			return errors.New(errMsg)
 		}
 		err = p.postHousekeepingStatus(roomID, roomCondition)
 		if err != nil { //might be access_token expired. Try to refresh it
-			log.Debugf("Failed to update room status after token refresh: %s", respBody.Message)
-			return err
+			errMsg := fmt.Sprintf("Failed to update room status after token refresh: %s", err.Error())
+			p.log.Debugf(errMsg)
+			return errors.New(errMsg)
 		} else {
 			return nil
 		}
@@ -442,20 +437,20 @@ func (p *Cloudbeds) postHousekeepingStatus(roomID string, roomCondition string) 
 	// check if respBody.Data is set
 	if respBody.Data.RoomID == "" {
 		detailedError := &hotel.DetailedError{Msg: err, Details: fmt.Sprintf("success, but return body is empty: %s", err)}
-		log.Debugf("but return body Data.RoomID is empty: %s", respBody.Data)
+		p.log.Debugf("but return body Data.RoomID is empty: %v", respBody.Data)
 		return detailedError
 	}
 
-	log.Infof("Room '%s' status successfully updated to '%s'.", respBody.Data.RoomID, respBody.Data.RoomCondition)
-	log.Debugf("HttpCode: %s. Response data: %v", resp.Status, respBody.Data)
+	p.log.Infof("Room '%s' status successfully updated to '%s'.", respBody.Data.RoomID, respBody.Data.RoomCondition)
+	p.log.Debugf("HttpCode: %s. Response data: %v", resp.Status, respBody.Data)
 
 	return nil
 }
 
-func (r *Room) SearchRoomIDByPhoneNumber(phoneNumber string) (string, error) {
+func (r *Room) SearchRoomIDByPhoneNumber(phoneNumber string, mapFileName string) (string, error) {
 	type RoomMap map[string]string
 	// Read file
-	jsonFile, err := os.Open("roomid_map.json")
+	jsonFile, err := os.Open(mapFileName)
 	if err != nil {
 		return "", err
 	}
@@ -467,7 +462,10 @@ func (r *Room) SearchRoomIDByPhoneNumber(phoneNumber string) (string, error) {
 	var roomMap RoomMap
 
 	// Unmarshal the JSON data into the map
-	json.Unmarshal(byteValue, &roomMap)
+	err = json.Unmarshal(byteValue, &roomMap)
+	if err != nil {
+		return "", err
+	}
 
 	// Look up room ID by phone number
 	roomID, ok := roomMap[phoneNumber]
@@ -478,8 +476,9 @@ func (r *Room) SearchRoomIDByPhoneNumber(phoneNumber string) (string, error) {
 	return roomID, nil
 }
 
-func setOauth2Config() {
-	log.Debugf("Setting oauth2 config")
+// setOauth2Config sets oauth2 config from env variables
+func (p *Cloudbeds) setOauth2Config() {
+	p.log.Debugf("Setting oauth2 config")
 	scopes := strings.Split(os.Getenv("CLOUDBEDS_SCOPES"), ",")
 	oauthConf = &oauth2.Config{
 		ClientID:     os.Getenv("CLOUDBEDS_CLIENT_ID"),

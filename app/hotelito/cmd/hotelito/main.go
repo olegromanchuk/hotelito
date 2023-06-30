@@ -19,20 +19,6 @@ func loggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-type callerHook struct{}
-
-func (hook *callerHook) Levels() []logrus.Level {
-	// Set levels on which the hook to be fired.
-	return logrus.AllLevels
-}
-
-func (hook *callerHook) Fire(entry *logrus.Entry) error {
-	// You can modify any field of the entry here,
-	// or use the entry to send logs to other places.
-	entry.Data["caller"] = entry.Caller
-	return nil
-}
-
 func main() {
 
 	//define logger
@@ -73,6 +59,7 @@ func main() {
 	//update housekeeping status
 	// test data: "544559-0", "clean"
 	api.HandleFunc("/housekeepings/{roomPhoneNumber}/{housekeepingStatus}/{housekeeperID}", h.HandleSetHousekeepingStatus).Methods("POST")
+	api.HandleFunc("/getRooms", h.HandleGetRooms).Methods("GET")
 
 	//3cx call info receiver
 	api.HandleFunc("/3cx/lookupbynumber", h.Handle3cxLookup).Methods("GET")
