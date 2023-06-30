@@ -29,7 +29,11 @@ func (h *Handler) HandleManualLogin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.Log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
+		_, err := w.Write([]byte(err.Error()))
+		if err != nil {
+			h.Log.Error(err)
+			return
+		}
 		return
 	}
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
@@ -43,13 +47,20 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.Log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
+		_, err := w.Write([]byte(err.Error()))
+		if err != nil {
+			return
+		}
 		return
 	}
 	h.Log.Debugf("Got auth code: %s state: %s", code, state)
 	h.Log.Infof("Ready for future requests")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(fmt.Sprintf("Great Success! Ready for future requests. You can close this window now.")))
+	_, err = w.Write([]byte("Great Success! Ready for future requests. You can close this window now."))
+	if err != nil {
+		h.Log.Error(err)
+		return
+	}
 }
 
 func (h *Handler) Handle3cxCallInfo(w http.ResponseWriter, r *http.Request) {
@@ -75,11 +86,19 @@ func (h *Handler) Handle3cxCallInfo(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.Log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
+		_, err = w.Write([]byte(err.Error()))
+		if err != nil {
+			h.Log.Error(err)
+			return
+		}
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(msg))
+	_, err = w.Write([]byte(msg))
+	if err != nil {
+		h.Log.Error(err)
+		return
+	}
 }
 
 func (h *Handler) Handle3cxLookup(w http.ResponseWriter, r *http.Request) {
@@ -111,7 +130,11 @@ func (h *Handler) Handle3cxLookup(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(js)
+	_, err = w.Write(js)
+	if err != nil {
+		h.Log.Error(err)
+		return
+	}
 
 }
 
@@ -132,11 +155,19 @@ func (h *Handler) HandleSetHousekeepingStatus(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		h.Log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
+		_, err = w.Write([]byte(err.Error()))
+		if err != nil {
+			h.Log.Error(err)
+			return
+		}
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(msg))
+	_, err = w.Write([]byte(msg))
+	if err != nil {
+		h.Log.Error(err)
+		return
+	}
 }
 
 func (h *Handler) HandleGetRooms(w http.ResponseWriter, r *http.Request) {
@@ -147,12 +178,20 @@ func (h *Handler) HandleGetRooms(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.Log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
+		_, err = w.Write([]byte(err.Error()))
+		if err != nil {
+			h.Log.Error(err)
+			return
+		}
 		return
 	}
 	msg := fmt.Sprintf("amount of rooms: %d", len(rooms))
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(msg))
+	_, err = w.Write([]byte(msg))
+	if err != nil {
+		h.Log.Error(err)
+		return
+	}
 }
 
 func (h *Handler) HandleMain(w http.ResponseWriter, r *http.Request) {

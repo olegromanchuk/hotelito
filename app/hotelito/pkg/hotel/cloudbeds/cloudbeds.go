@@ -241,7 +241,7 @@ func (p *Cloudbeds) login(secretStore secrets.SecretsStore) (statusCodeMsg strin
 		//call oauth2 login
 		p.setOauth2Config()
 		msg = fmt.Sprintln("No refresh token found. Please run this link in browser to login to Cloudbeds: ", oauthConf.AuthCodeURL(oauthStateString))
-		return fmt.Sprintf("no-refresh-token-found"), msg
+		return "no-refresh-token-found", msg
 	}
 
 	// get new access token via refresh token
@@ -254,14 +254,18 @@ func (p *Cloudbeds) login(secretStore secrets.SecretsStore) (statusCodeMsg strin
 	newToken, err := tokenSource.Token()
 	if err != nil {
 		p.log.Info("failed to get new access token. Looks like refresh token is stale. Clearing it and try to login again")
-		secretStore.StoreRefreshToken("")
+		err := secretStore.StoreRefreshToken("")
+		if err != nil {
+			p.log.Fatalf("failed to clear refresh token from secret store: %v", err)
+			return "", ""
+		}
 		loginLoopPreventionCounter++
 		if loginLoopPreventionCounter <= 2 {
 			statusRefresh, msgStatus := p.login(secretStore)
 			return statusRefresh, msgStatus
 		}
 		p.log.Debugf("Login loop prevention counter: %d", loginLoopPreventionCounter)
-		return fmt.Sprintln("failed-to-get-refresh-token"), fmt.Sprintf("failed to get new access token")
+		return fmt.Sprintln("failed-to-get-refresh-token"), "failed to get new access token"
 	}
 	p.log.Debugf("Issued new access token with len: %v", len(newToken.AccessToken))
 	return "ok", ""
@@ -290,7 +294,10 @@ func (p *Cloudbeds) refreshToken() error {
 	}
 
 	p.httpClient = oauthConf.Client(context.Background(), token)
-	p.storeClient.StoreAccessToken(newToken.AccessToken)
+	err = p.storeClient.StoreAccessToken(newToken.AccessToken)
+	if err != nil {
+		return err
+	}
 
 	p.log.Debugf("Issued new access token with len: %d", len(newToken.AccessToken))
 	return nil
@@ -363,7 +370,7 @@ func New(log *logrus.Logger) *Cloudbeds {
 }
 
 func (p *Cloudbeds) Close() error {
-	err := p.Close()
+	err := p.storeClient.Close()
 	if err != nil {
 		p.log.Error(err)
 	}
@@ -455,7 +462,10 @@ func (r *Room) SearchRoomIDByPhoneNumber(phoneNumber string, mapFileName string)
 	var roomMap RoomMap
 
 	// Unmarshal the JSON data into the map
-	json.Unmarshal(byteValue, &roomMap)
+	err = json.Unmarshal(byteValue, &roomMap)
+	if err != nil {
+		return "", err
+	}
 
 	// Look up room ID by phone number
 	roomID, ok := roomMap[phoneNumber]

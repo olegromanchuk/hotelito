@@ -19,20 +19,6 @@ func loggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-type callerHook struct{}
-
-func (hook *callerHook) Levels() []logrus.Level {
-	// Set levels on which the hook to be fired.
-	return logrus.AllLevels
-}
-
-func (hook *callerHook) Fire(entry *logrus.Entry) error {
-	// You can modify any field of the entry here,
-	// or use the entry to send logs to other places.
-	entry.Data["caller"] = entry.Caller
-	return nil
-}
-
 func main() {
 
 	//define logger

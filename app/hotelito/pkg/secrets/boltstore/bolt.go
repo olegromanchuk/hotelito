@@ -98,3 +98,7 @@ func Initialize() (*BoltDBStore, error) {
 	}
 	return &BoltDBStore{Db: dbref}, nil
 }
+
+func (s *BoltDBStore) Close() error {
+	return s.Db.Close()
+}

@@ -12,6 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       MY_WORKDIR: ./app/hotelito
+    defaults:
+      run:
+        working-directory: ${{ env.MY_WORKDIR }}
 
     steps:
       - name: set up go 1.20
