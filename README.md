@@ -1,6 +1,4 @@
-<div align="center">
 [![Coverage Status](https://coveralls.io/repos/github/olegromanchuk/hotelito/badge.svg?branch=master)](https://coveralls.io/github/olegromanchuk/hotelito?branch=master)
-</div>
 
 # Hotelito
 
