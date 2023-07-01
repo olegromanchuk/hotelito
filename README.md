@@ -1,3 +1,4 @@
+[![build](https://github.com/olegromanchuk/hotelito/actions/workflows/ci.yml/badge.svg)](https://github.com/olegromanchuk/hotelito/actions/workflows/ci.yml)
 [![Coverage Status](https://coveralls.io/repos/github/olegromanchuk/hotelito/badge.svg?branch=master)](https://coveralls.io/github/olegromanchuk/hotelito?branch=master)
 
 # Hotelito
