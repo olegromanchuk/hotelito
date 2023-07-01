@@ -11,6 +11,10 @@ all: test build
 build:
 	cd cmd/hotelito && go build -o ../../bin/hotelito
 
+release:
+	@echo release
+	goreleaser --snapshot --skip-publish --clean
+
 test:
 	go clean -testcache
 	go test -race -coverprofile=profile.cov ./...
