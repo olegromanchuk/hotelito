@@ -1,3 +1,5 @@
 **/.env
 **/.tmp
 **/secrets.db
+dist/
+
