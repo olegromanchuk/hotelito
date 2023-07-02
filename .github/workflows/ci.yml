@@ -2,7 +2,7 @@ name: build
 
 on:
   push:
-    branches: [ standalone-dev, master ]
+    branches: [ develop, master ]
     tags:
   pull_request:
     branches: [ master ]
