@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/olegromanchuk/hotelito/pkg/hotel"
 	"github.com/olegromanchuk/hotelito/pkg/secrets"
-	"github.com/olegromanchuk/hotelito/pkg/secrets/boltstore"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"io"
@@ -334,7 +333,7 @@ func (p *Cloudbeds) HandleCallback(state, code string) (err error) {
 	return nil
 }
 
-func New(log *logrus.Logger) *Cloudbeds {
+func New(log *logrus.Logger, secretStore secrets.SecretsStore) *Cloudbeds {
 	log.Debugf("Creating new Cloudbeds client")
 	cloudbedsClient := &Cloudbeds{
 		log: log,
@@ -344,12 +343,7 @@ func New(log *logrus.Logger) *Cloudbeds {
 
 	//get access_token
 
-	//current secret store - boltDB
-	storeClient, err := boltstore.Initialize()
-	if err != nil {
-		log.Fatal(err)
-	}
-	cloudbedsClient.storeClient = storeClient
+	cloudbedsClient.storeClient = secretStore
 
 	//check if access_token is valid. If not - get refresh_token and update access_token
 	accessToken, err := cloudbedsClient.storeClient.RetrieveAccessToken()

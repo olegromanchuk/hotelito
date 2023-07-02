@@ -89,8 +89,7 @@ CLOUDBEDS_TOKEN_URL=https://hotels.cloudbeds.com/api/v1.1/access_token
 - then open, disable Call Journaling and save; 
 - then open again, enable Call Journaling and save.  
 It is needed to clear 3CX caching. Was discovered through numerous tests. If you just add/save a new template the old cached settings will be used.
-
-TODO   
+   
 6. Create IVR "clean" and "dirty".  
 
 
@@ -111,16 +110,21 @@ TODO
 ## Deploy
 
 ### Local testing standalone
+```
 cd hotelito
 go build -o cmd/hotelito/hotelito cmd/hotelito/main.go
 ./cmd/hotelito/hotelito
+```
 
 ### Local testing AWS
-cd cloudbeds/
-env GOOS=linux go build -o cloudbeds
+```
+cd app/
+env GOOS=linux go build -o hotelito_lambda
 cd ../
 sam local start-api
+```
+`sam build` creates .aws-sam directory that is used for `sam local start-api`. Keep that in mind when running `sam local start-api`. If this directory doesn't exist the binary should exist in the directory when a source code is located. You MUST build the binary for Linux, as shown above. If the binary doesn't exist or was built for different architecture you will get an unclear error from sam.
 
 ## TODO
-[ ] makefile
-[ ] workflows
+[x] makefile  
+[x] workflows

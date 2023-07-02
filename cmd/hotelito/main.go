@@ -6,6 +6,7 @@ import (
 	"github.com/olegromanchuk/hotelito/internal/handlers"
 	"github.com/olegromanchuk/hotelito/pkg/hotel/cloudbeds"
 	"github.com/olegromanchuk/hotelito/pkg/pbx/pbx3cx"
+	"github.com/olegromanchuk/hotelito/pkg/secrets/boltstore"
 	"github.com/sirupsen/logrus"
 	"log"
 	"net/http"
@@ -39,8 +40,14 @@ func main() {
 
 	//   ---------------------- Cloudbed parts ----------------------
 
+	//current secret store - boltDB
+	storeClient, err := boltstore.Initialize()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	//create cloudbeds client
-	clbClient := cloudbeds.New(log)
+	clbClient := cloudbeds.New(log, storeClient)
 	defer clbClient.Close()
 
 	//create 3cx client
