@@ -1,7 +1,7 @@
 [![build](https://github.com/olegromanchuk/hotelito/actions/workflows/ci.yml/badge.svg)](https://github.com/olegromanchuk/hotelito/actions/workflows/ci.yml)
 [![Coverage Status](https://coveralls.io/repos/github/olegromanchuk/hotelito/badge.svg?branch=master)](https://coveralls.io/github/olegromanchuk/hotelito?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/olegromanchuk/hotelito)](https://goreportcard.com/report/github.com/olegromanchuk/hotelito)
-![GitHub release (release name instead of tag name)](https://img.shields.io/github/v/release/olegromanchuk/hotelito)
+[![GitHub release (release name instead of tag name)](https://img.shields.io/github/v/release/olegromanchuk/hotelito)](https://github.com/olegromanchuk/hotelito/releases)
 
 # Hotelito
 
