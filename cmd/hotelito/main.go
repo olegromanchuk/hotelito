@@ -24,13 +24,20 @@ func main() {
 
 	//define logger
 	log := logrus.New()
-	// The default level is info.
-	log.SetLevel(logrus.DebugLevel)
-	//log.SetReportCaller(true)
-	//log.AddHook(&callerHook{})
+	// The default level is debug.
+	logLevelEnv := os.Getenv("LOG_LEVEL")
+	if logLevelEnv == "" {
+		logLevelEnv = "debug"
+	}
+	logLevel, err := logrus.ParseLevel(logLevelEnv)
+	if err != nil {
+		logLevel = logrus.DebugLevel
+	}
+	log.SetLevel(logLevel)
 
 	// Set output of logs to Stdout
 	log.SetOutput(os.Stdout)
+	log.Infof("Log level: %s", logLevelEnv)
 
 	readAuthVarsFromFile()
 

@@ -2,6 +2,7 @@ package cloudbeds
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,10 +11,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"io"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
+	"time"
 )
 
 type Room struct {
@@ -30,10 +33,6 @@ type Room struct {
 	RoomCondition     string `json:"RoomCondition,omitempty"`
 	RoomOccupied      bool   `json:"RoomOccupied,omitempty"`
 }
-
-const (
-	oauthStateString = "random"
-)
 
 var (
 	oauthConf                  *oauth2.Config
@@ -216,9 +215,15 @@ func (p *Cloudbeds) GetRoom(roomNumber string) (hotel.Room, error) {
 // handleLogin helper function to handle login. Just redirect to oauth2 provider login page
 func (p *Cloudbeds) HandleManualLogin() (url string, err error) {
 	p.setOauth2Config()
+	oauthStateString := p.generateRandomString(10)
 	url = oauthConf.AuthCodeURL(oauthStateString)
 	if url == "" {
 		return url, fmt.Errorf("failed to retrieve oauth2 url. Check .env file and make sure that all variables related to CLOUDBEDS are set. Refer to .env_example")
+	}
+	//save "state" for future validation by the callback function
+	err = p.storeClient.StoreOauthState(oauthStateString)
+	if err != nil {
+		return "", err
 	}
 	return url, nil
 }
@@ -228,6 +233,7 @@ func (p *Cloudbeds) login(secretStore secrets.SecretsStore) (statusCodeMsg strin
 	if loginLoopPreventionCounter > 1 {
 		p.log.Debugf("Running login in a loop %d time", loginLoopPreventionCounter)
 	}
+	oauthStateString := p.generateRandomString(10) // adjust the length as per your needs
 
 	// try to retrieve refresh token from secret store
 	p.log.Debugf("Trying to retrieve refresh token from secret store")
@@ -240,6 +246,13 @@ func (p *Cloudbeds) login(secretStore secrets.SecretsStore) (statusCodeMsg strin
 		//call oauth2 login
 		p.setOauth2Config()
 		msg = fmt.Sprintln("No refresh token found. Please run this link in browser to login to Cloudbeds: ", oauthConf.AuthCodeURL(oauthStateString))
+		//save "state" for future validation by the callback function
+		err = p.storeClient.StoreOauthState(oauthStateString)
+		if err != nil {
+			errMsg := fmt.Sprintf("failed to store oauth state: %v", err)
+			p.log.Errorf(errMsg)
+			return "", ""
+		}
 		return "no-refresh-token-found", msg
 	}
 
@@ -304,6 +317,12 @@ func (p *Cloudbeds) refreshToken() error {
 
 func (p *Cloudbeds) HandleCallback(state, code string) (err error) {
 	p.log.Debugf("Handling callback in cloudbeds")
+	oauthStateString, err := p.storeClient.RetrieveOauthState(state)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to retrieve oauth state from secret store: %v. Possibly state does not exist or stale. Try to login again", err.Error())
+		p.log.Debug(errMsg)
+		return errors.New(errMsg)
+	}
 	if state != oauthStateString {
 		p.log.Errorf("invalid oauth state, expected '%s', got '%s'", oauthStateString, state)
 		return fmt.Errorf("invalid oauth state, expected '%s', got '%s'\n", oauthStateString, state)
@@ -484,4 +503,17 @@ func (p *Cloudbeds) setOauth2Config() {
 			TokenURL: os.Getenv("CLOUDBEDS_TOKEN_URL"),
 		},
 	}
+}
+
+func (p *Cloudbeds) generateRandomString(length int) string {
+	bytes := make([]byte, length)
+	p.log.Debugf("Generating random string of length %d", length)
+	// Seed the random number generator with the current time
+	rand.Seed(time.Now().UnixNano())
+
+	if _, err := rand.Read(bytes); err != nil {
+		p.log.Fatal(err)
+	}
+	p.log.Debugf("Generated random string: %s", hex.EncodeToString(bytes))
+	return hex.EncodeToString(bytes)
 }
