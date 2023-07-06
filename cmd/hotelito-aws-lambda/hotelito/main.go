@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/olegromanchuk/hotelito/pkg/hotel/cloudbeds"
 	"github.com/olegromanchuk/hotelito/pkg/pbx/pbx3cx"
+	"github.com/olegromanchuk/hotelito/pkg/secrets/awsstore"
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"os"
@@ -15,26 +15,47 @@ import (
 	"github.com/olegromanchuk/hotelito/internal/handlers"
 )
 
-var (
-	// DefaultHTTPGetAddress Default Address
-	DefaultHTTPGetAddress = "https://checkip.amazonaws.com"
-
-	// ErrNoIP No IP found in response
-	ErrNoIP = errors.New("No IP in HTTP response")
-
-	// ErrNon200Response non 200 status code in response
-	ErrNon200Response = errors.New("Non 200 Response found")
-)
-
-func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+func HandleCallback(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	fmt.Print(request)
 	//define logger
 	log := logrus.New()
-	log.SetLevel(logrus.DebugLevel)
+	// The default level is debug.
+	logLevelEnv := os.Getenv("LOG_LEVEL")
+	if logLevelEnv == "" {
+		logLevelEnv = "debug"
+	}
+	logLevel, err := logrus.ParseLevel(logLevelEnv)
+	if err != nil {
+		logLevel = logrus.DebugLevel
+	}
+	log.SetLevel(logLevel)
 	log.SetOutput(os.Stdout)
+	log.Infof("Log level: %s", logLevelEnv)
+
+	//get APP_NAME from env
+	appName := os.Getenv("APPLICATION_NAME")
+	if appName == "" {
+		log.Debug("APPLICATION_NAME env variable is not set")
+		appName = "hotelito-app"
+	}
+	log.Debugf("APPLICATION_NAME: %s", appName)
+
+	environmentType := os.Getenv("ENVIRONMENT")
+	if environmentType == "" {
+		log.Debug("ENVIRONMENT env variable is not set")
+		environmentType = "dev"
+	}
+	log.Debugf("ENVIRONMENT: %s", environmentType)
+
+	awsRegion := os.Getenv("AWS_REGION")
+	if awsRegion == "" {
+		log.Debug("AWS_REGION env variable is not set")
+		awsRegion = "us-east-2"
+	}
+	log.Debugf("AWS_REGION: %s", awsRegion)
 
 	//current secret store - aws env variables
-	storeClient, err := awsStore.Initialize()
+	storeClient, err := awsstore.Initialize(appName, awsRegion)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -52,7 +73,7 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 	log.Debugf("Handling callback")
 	state := request.QueryStringParameters["state"]
 	code := request.QueryStringParameters["code"]
-	err := h.Hotel.HandleCallback(state, code)
+	err = h.Hotel.HandleCallback(state, code)
 	if err != nil {
 		log.Error(err)
 		return events.APIGatewayProxyResponse{
@@ -68,31 +89,6 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 	}, nil
 }
 
-// func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-// 	resp, err := http.Get(DefaultHTTPGetAddress)
-// 	if err != nil {
-// 		return events.APIGatewayProxyResponse{}, err
-// 	}
-
-// 	if resp.StatusCode != 200 {
-// 		return events.APIGatewayProxyResponse{}, ErrNon200Response
-// 	}
-
-// 	ip, err := io.ReadAll(resp.Body)
-// 	if err != nil {
-// 		return events.APIGatewayProxyResponse{}, err
-// 	}
-
-// 	if len(ip) == 0 {
-// 		return events.APIGatewayProxyResponse{}, ErrNoIP
-// 	}
-
-// 	return events.APIGatewayProxyResponse{
-// 		Body:       fmt.Sprintf("Hello, %v", string(ip)),
-// 		StatusCode: 200,
-// 	}, nil
-// }
-
 func main() {
-	lambda.Start(HandleRequest)
+	lambda.Start(HandleCallback)
 }

@@ -503,6 +503,10 @@ func (p *Cloudbeds) setOauth2Config() {
 			TokenURL: os.Getenv("CLOUDBEDS_TOKEN_URL"),
 		},
 	}
+	//check that all env variables are set
+	if oauthConf.ClientID == "" || oauthConf.ClientSecret == "" || oauthConf.RedirectURL == "" || oauthConf.Scopes == nil || oauthConf.Endpoint.AuthURL == "" || oauthConf.Endpoint.TokenURL == "" {
+		p.log.Fatal("Not all required env variables are set. Missed one of: CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET, CLOUDBEDS_REDIRECT_URL, CLOUDBEDS_SCOPES, CLOUDBEDS_AUTH_URL, CLOUDBEDS_TOKEN_URL")
+	}
 }
 
 func (p *Cloudbeds) generateRandomString(length int) string {

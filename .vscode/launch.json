@@ -3,72 +3,26 @@
         {
             "type": "aws-sam",
             "request": "direct-invoke",
-            "name": "hotelito-lambda-go1.x:HelloWorldFunction (go1.x)",
+            "name": "hotelito-aws-lambda:HotelitoFunction",
             "invokeTarget": {
                 "target": "template",
-                "templatePath": "${workspaceFolder}/tmp/hotelito-lambda-go1.x/template.yaml",
-                "logicalId": "HelloWorldFunction"
+                "templatePath": "${workspaceFolder}/cmd/hotelito-aws-lambda/template.yaml",
+                "logicalId": "HotelitoFunction"
             },
             "lambda": {
                 "payload": {},
-                "environmentVariables": {},
-                "runtime": "go1.x"
+                "environmentVariables": {}
             }
         },
         {
-            "type": "aws-sam",
-            "request": "direct-invoke",
-            "name": "API hotelito-lambda-go1.x:HelloWorldFunction (go1.x)",
-            "invokeTarget": {
-                "target": "api",
-                "templatePath": "${workspaceFolder}/tmp/hotelito-lambda-go1.x/template.yaml",
-                "logicalId": "HelloWorldFunction"
-            },
-            "api": {
-                "path": "/hello",
-                "httpMethod": "GET",
-                "payload": {
-                    "json": {}
-                }
-            },
-            "lambda": {
-                "runtime": "go1.x"
-            }
-        },
-        {
-            "type": "aws-sam",
-            "request": "direct-invoke",
-            "name": "cloudbeds-3cx-go1.x:HelloWorldFunction (go1.x)",
-            "invokeTarget": {
-                "target": "template",
-                "templatePath": "${workspaceFolder}/cloudbeds-3cx-go1.x/template.yaml",
-                "logicalId": "HelloWorldFunction"
-            },
-            "lambda": {
-                "payload": {},
-                "environmentVariables": {},
-                "runtime": "go1.x"
-            }
-        },
-        {
-            "type": "aws-sam",
-            "request": "direct-invoke",
-            "name": "API cloudbeds-3cx-go1.x:HelloWorldFunction (go1.x)",
-            "invokeTarget": {
-                "target": "api",
-                "templatePath": "${workspaceFolder}/cloudbeds-3cx-go1.x/template.yaml",
-                "logicalId": "HelloWorldFunction"
-            },
-            "api": {
-                "path": "/hello",
-                "httpMethod": "GET",
-                "payload": {
-                    "json": {}
-                }
-            },
-            "lambda": {
-                "runtime": "go1.x"
-            }
+            "name": "Debug with SAM",
+            "type": "go",
+            "request": "attach",
+            "mode": "remote",
+            "port": 5986,
+            "host": "localhost",
+            "env": {},
+            "args": []
         }
     ]
 }

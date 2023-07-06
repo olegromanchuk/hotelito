@@ -28,7 +28,18 @@ Resources:
             Method: GET
       Environment: # More info about Env Vars: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#environment-object
         Variables:
-          PARAM1: VALUE
+          ENVIRONMENT: ''
+          APPLICATION_NAME: !Ref '${APPLICATION_NAME}'
+          LOG_LEVEL: ''
+          CLOUDBEDS_CLIENT_ID: ''
+          CLOUDBEDS_CLIENT_SECRET: ''
+          CLOUDBEDS_REDIRECT_URL: ''
+          CLOUDBEDS_SCOPES: ''
+          CLOUDBEDS_AUTH_URL: ''
+          CLOUDBEDS_TOKEN_URL: ''
+          CLOUDBEDS_PHONE2ROOM_MAP_FILENAME: ''
+          AWS_REGION: !Ref 'AWS::Region'
+
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
