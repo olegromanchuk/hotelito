@@ -4,3 +4,4 @@
 **/environmental_vars.json
 dist/
 .idea/
+**/*private_nogit*

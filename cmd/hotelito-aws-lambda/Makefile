@@ -1,14 +1,18 @@
 .PHONY: build
 
-build:
+build-all:
 	./sync_environmental_vars.sh
 	rm -rf .aws-sam
 	sam build
 
+build-cb:
+	./sync_environmental_vars.sh
+	rm -rf .aws-sam
+	sam build CallbackFunction
 
-invoke-callback:
+invoke-cb:
 	sam local invoke CallbackFunction -e events/event_org.json --env-vars environmental_vars.json
-run-cb: build invoke-callback
+run-cb: build-cb invoke-cb
 
 build-init:
 	./sync_environmental_vars.sh
