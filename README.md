@@ -98,6 +98,7 @@ It is needed to clear 3CX caching. Was discovered through numerous tests. If you
 ### Install AWS Lambda version
 
 - Create .env file that will contain all the configuration parameters. See included .env_example.
+- `cd cmd/hotelito-aws-lambda`
 - Run "setup_aws.sh". This script will create necessary parameters from .env in the AWS Parameter Store.
 
 ### Helpful links:
@@ -116,7 +117,18 @@ It is needed to clear 3CX caching. Was discovered through numerous tests. If you
 
 
 
-## Testing
+## Development notes and testing
+
+Standalone version located in cmd/hotelito. AWS Lambda version located in cmd/hotelito-aws-lambda.
+```
+├── cmd
+│   ├── hotelito
+│       └── main.go
+│   └── hotelito-aws-lambda
+│       ├── ...
+```
+
+Shared code is located in `internal` and `pkg` directories.
 
 ### Local testing standalone on localhost
 ```
