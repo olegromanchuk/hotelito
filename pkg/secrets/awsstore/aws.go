@@ -11,6 +11,7 @@ type AWSSecretsStore struct {
 	AccessTokenParamName  string
 	RefreshTokenParamName string
 	AWSSession            *session.Session
+	StorePrefix           string
 }
 
 func (s *AWSSecretsStore) StoreAccessToken(token string) error {
@@ -80,8 +81,11 @@ func (s *AWSSecretsStore) RetrieveRefreshToken() (string, error) {
 func (s *AWSSecretsStore) StoreOauthState(state string) error {
 	ssmSvc := ssm.New(s.AWSSession)
 
+	//get full name including app name and environment type
+	fullParamName := fmt.Sprintf("/%s/%s", s.StorePrefix, state)
+
 	input := &ssm.PutParameterInput{
-		Name:      aws.String(state),
+		Name:      aws.String(fullParamName),
 		Overwrite: aws.Bool(true),
 		Type:      aws.String("String"),
 		Value:     aws.String(state),
@@ -94,8 +98,11 @@ func (s *AWSSecretsStore) StoreOauthState(state string) error {
 func (s *AWSSecretsStore) RetrieveOauthState(state string) (string, error) {
 	ssmSvc := ssm.New(s.AWSSession)
 
+	//get full name including app name and environment type
+	fullParamName := fmt.Sprintf("/%s/%s", s.StorePrefix, state)
+
 	input := &ssm.GetParameterInput{
-		Name:           aws.String(state),
+		Name:           aws.String(fullParamName),
 		WithDecryption: aws.Bool(false),
 	}
 
@@ -119,9 +126,9 @@ func (s *AWSSecretsStore) RetrieveOauthState(state string) (string, error) {
 	return value, nil
 }
 
-func Initialize(appName string, awsRegion string) (*AWSSecretsStore, error) {
-	accessTokenParamName := fmt.Sprintf("/%s/access_token", appName)
-	refreshTokenParamName := fmt.Sprintf("/%s/refresh_token", appName)
+func Initialize(storePrefix string, awsRegion string) (*AWSSecretsStore, error) {
+	accessTokenParamName := fmt.Sprintf("/%s/access_token", storePrefix)
+	refreshTokenParamName := fmt.Sprintf("/%s/refresh_token", storePrefix)
 
 	// Initialize a session that the SDK uses to load
 	// credentials from the shared credentials file. (~/.aws/credentials).
@@ -134,7 +141,8 @@ func Initialize(appName string, awsRegion string) (*AWSSecretsStore, error) {
 
 	return &AWSSecretsStore{AccessTokenParamName: accessTokenParamName,
 		RefreshTokenParamName: refreshTokenParamName,
-		AWSSession:            sess}, nil
+		AWSSession:            sess,
+		StorePrefix:           storePrefix}, nil
 }
 
 func (s *AWSSecretsStore) Close() error {

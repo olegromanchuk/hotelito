@@ -43,7 +43,7 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	h.Log.Debugf("Handling callback")
 	state := r.FormValue("state")
 	code := r.FormValue("code")
-	err := h.Hotel.HandleCallback(state, code)
+	err := h.Hotel.HandleOAuthCallback(state, code)
 	if err != nil {
 		h.Log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)

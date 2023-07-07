@@ -315,8 +315,8 @@ func (p *Cloudbeds) refreshToken() error {
 	return nil
 }
 
-func (p *Cloudbeds) HandleCallback(state, code string) (err error) {
-	p.log.Debugf("Handling callback in cloudbeds")
+func (p *Cloudbeds) HandleOAuthCallback(state, code string) (err error) {
+	p.log.Debugf("Handling oauth callback in cloudbeds. State: %s, Code: %s", state, code)
 	oauthStateString, err := p.storeClient.RetrieveOauthState(state)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to retrieve oauth state from secret store: %v. Possibly state does not exist or stale. Try to login again", err.Error())
@@ -324,8 +324,9 @@ func (p *Cloudbeds) HandleCallback(state, code string) (err error) {
 		return errors.New(errMsg)
 	}
 	if state != oauthStateString {
-		p.log.Errorf("invalid oauth state, expected '%s', got '%s'", oauthStateString, state)
-		return fmt.Errorf("invalid oauth state, expected '%s', got '%s'\n", oauthStateString, state)
+		errMsg := fmt.Sprintf("invalid oauth state, expected '%s', got '%s'", oauthStateString, state)
+		p.log.Error(errMsg)
+		return errors.New(errMsg)
 	}
 
 	token, err := oauthConf.Exchange(context.Background(), code)
@@ -335,7 +336,7 @@ func (p *Cloudbeds) HandleCallback(state, code string) (err error) {
 	}
 	p.log.Debugf("Got access token of length: %d", len(token.AccessToken))
 
-	// get pre-authorized client for future requests
+	// get pre-authorized client for future requests (doesn't make a lot of sense for aws version)
 	p.httpClient = oauthConf.Client(context.Background(), token)
 
 	//save access and refresh token to secret store
@@ -378,6 +379,18 @@ func New(log *logrus.Logger, secretStore secrets.SecretsStore) *Cloudbeds {
 		AccessToken: accessToken,
 	}
 	cloudbedsClient.httpClient = oauthConf.Client(context.Background(), token)
+
+	return cloudbedsClient
+}
+
+func NewClient4Callback(log *logrus.Logger, secretStore secrets.SecretsStore) *Cloudbeds {
+	log.Debugf("Creating new Cloudbeds client")
+	cloudbedsClient := &Cloudbeds{
+		log:         log,
+		storeClient: secretStore,
+	}
+	cloudbedsClient.refresher = cloudbedsClient //refresher is an interface! This feint with ears is needed to point refreshToken method to itself. Now call p.refresher.refreshToken() will call refreshToken method of Cloudbeds struct
+	//refresher was created as interface to make the code more testable
 
 	return cloudbedsClient
 }
