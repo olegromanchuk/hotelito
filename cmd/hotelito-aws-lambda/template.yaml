@@ -12,16 +12,45 @@ Globals:
     MemorySize: 128
 
 Resources:
-  HotelitoFunction:
+  InitialAuthorizationFunction:
+      Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+      Properties:
+        CodeUri: hotelito/cloudbeds/initial_authorization
+        Handler: main
+        Runtime: go1.x
+        Architectures:
+          - x86_64
+        Events:
+          GetInitialAuthorization:
+            Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+            Properties:
+              Path: /
+              Method: GET
+        Environment: # More info about Env Vars: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#environment-object
+          Variables:
+            ENVIRONMENT: ''
+            APPLICATION_NAME: ''
+            LOG_LEVEL: ''
+            CLOUDBEDS_CLIENT_ID: ''
+            CLOUDBEDS_CLIENT_SECRET: ''
+            CLOUDBEDS_REDIRECT_URL: ''
+            CLOUDBEDS_SCOPES: ''
+            CLOUDBEDS_AUTH_URL: ''
+            CLOUDBEDS_TOKEN_URL: ''
+            CLOUDBEDS_PHONE2ROOM_MAP_FILENAME: ''
+            AWS_REGION: ''
+
+
+  CallbackFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
-      CodeUri: hotelito/
-      Handler: hotelito_lambda
+      CodeUri: hotelito/cloudbeds/oauth2callback/
+      Handler: main
       Runtime: go1.x
       Architectures:
         - x86_64
       Events:
-        CatchAll:
+        GetCallback:
           Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
           Properties:
             Path: /callback
@@ -29,7 +58,7 @@ Resources:
       Environment: # More info about Env Vars: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#environment-object
         Variables:
           ENVIRONMENT: ''
-          APPLICATION_NAME: !Ref '${APPLICATION_NAME}'
+          APPLICATION_NAME: ''
           LOG_LEVEL: ''
           CLOUDBEDS_CLIENT_ID: ''
           CLOUDBEDS_CLIENT_SECRET: ''
@@ -38,8 +67,63 @@ Resources:
           CLOUDBEDS_AUTH_URL: ''
           CLOUDBEDS_TOKEN_URL: ''
           CLOUDBEDS_PHONE2ROOM_MAP_FILENAME: ''
-          AWS_REGION: !Ref 'AWS::Region'
+          AWS_REGION: ''
 
+  3CXLookupByNumberFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: hotelito/3cx/lookupbynumber/
+      Handler: main
+      Runtime: go1.x
+      Architectures:
+        - x86_64
+      Events:
+        GetLookupByNumber:
+          Type: Api
+          Properties:
+            Path: /3cx/lookupbynumber
+            Method: GET
+      Environment:
+        Variables:
+          ENVIRONMENT: ''
+          APPLICATION_NAME: ''
+          LOG_LEVEL: ''
+          CLOUDBEDS_CLIENT_ID: ''
+          CLOUDBEDS_CLIENT_SECRET: ''
+          CLOUDBEDS_REDIRECT_URL: ''
+          CLOUDBEDS_SCOPES: ''
+          CLOUDBEDS_AUTH_URL: ''
+          CLOUDBEDS_TOKEN_URL: ''
+          CLOUDBEDS_PHONE2ROOM_MAP_FILENAME: ''
+          AWS_REGION: ''
+
+  3CXOutboundCallFunction:
+      Type: AWS::Serverless::Function
+      Properties:
+        CodeUri: hotelito/3cx/outbound_call/
+        Handler: main
+        Runtime: go1.x
+        Architectures:
+          - x86_64
+        Events:
+          PostOutboundCall:
+            Type: Api
+            Properties:
+              Path: /3cx/outbound_call
+              Method: POST
+        Environment:
+          Variables:
+            ENVIRONMENT: ''
+            APPLICATION_NAME: ''
+            LOG_LEVEL: ''
+            CLOUDBEDS_CLIENT_ID: ''
+            CLOUDBEDS_CLIENT_SECRET: ''
+            CLOUDBEDS_REDIRECT_URL: ''
+            CLOUDBEDS_SCOPES: ''
+            CLOUDBEDS_AUTH_URL: ''
+            CLOUDBEDS_TOKEN_URL: ''
+            CLOUDBEDS_PHONE2ROOM_MAP_FILENAME: ''
+            AWS_REGION: ''
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
@@ -47,10 +131,10 @@ Outputs:
   # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
   HotelitoAPI:
     Description: "API Gateway endpoint URL for Prod environment for Hotelito integration Function"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
-  HotelitoFunction:
-    Description: "Hotelito Lambda Function ARN"
-    Value: !GetAtt HotelitoFunction.Arn
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+  CallbackFunction:
+    Description: "Hotelito CallbackFunction Lambda Function ARN"
+    Value: !GetAtt CallbackFunction.Arn
   HotelitoFunctionIamRole:
     Description: "Implicit IAM Role created for Hotelito function"
-    Value: !GetAtt HotelitoFunction.Arn
+    Value: !GetAtt CallbackFunction.Arn

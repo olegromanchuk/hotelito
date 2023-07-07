@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/olegromanchuk/hotelito/pkg/hotel/cloudbeds"
-	"github.com/olegromanchuk/hotelito/pkg/pbx/pbx3cx"
 	"github.com/olegromanchuk/hotelito/pkg/secrets/awsstore"
 	"github.com/sirupsen/logrus"
 	"net/http"
@@ -12,7 +11,6 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/olegromanchuk/hotelito/internal/handlers"
 )
 
 func HandleCallback(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
@@ -54,26 +52,29 @@ func HandleCallback(ctx context.Context, request events.APIGatewayProxyRequest) 
 	}
 	log.Debugf("AWS_REGION: %s", awsRegion)
 
+	storePrefix := fmt.Sprintf("%s/%s", appName, environmentType) //hotelito-app-production
 	//current secret store - aws env variables
-	storeClient, err := awsstore.Initialize(appName, awsRegion)
+	storeClient, err := awsstore.Initialize(storePrefix, awsRegion)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	//create cloudbeds client
-	clbClient := cloudbeds.New(log, storeClient)
+	clbClient := cloudbeds.NewClient4Callback(log, storeClient)
 
-	//create 3cx client
-	pbx3cxClient := pbx3cx.New(log)
-
-	//define handlers
-	h := handlers.NewHandler(log, pbx3cxClient, clbClient)
-
-	// Your handle login logic here
+	// exctract state and code from request
 	log.Debugf("Handling callback")
 	state := request.QueryStringParameters["state"]
 	code := request.QueryStringParameters["code"]
-	err = h.Hotel.HandleCallback(state, code)
+
+	//option via handler interface. Helpful for testing
+	////create 3cx client
+	//pbx3cxClient := pbx3cx.New(log)
+	////define handlers
+	//h := handlers.NewHandler(log, pbx3cxClient, clbClient)
+	//err = h.Hotel.HandleOAuthCallback(state, code)
+
+	err = clbClient.HandleOAuthCallback(state, code)
 	if err != nil {
 		log.Error(err)
 		return events.APIGatewayProxyResponse{
@@ -81,11 +82,9 @@ func HandleCallback(ctx context.Context, request events.APIGatewayProxyRequest) 
 			Body:       fmt.Sprintf("Error: %v", err),
 		}, nil
 	}
-	log.Debugf("Got auth code: %s state: %s", code, state)
-	log.Infof("Ready for future requests")
+
 	return events.APIGatewayProxyResponse{
 		StatusCode: http.StatusOK,
-		Body:       "Great Success! Ready for future requests. You can close this window now.",
 	}, nil
 }
 

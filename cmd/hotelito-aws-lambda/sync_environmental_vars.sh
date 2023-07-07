@@ -26,10 +26,14 @@ if [ -f $JSON_FILE ]; then
 fi
 
 # Add opening brace to start JSON
-echo "{
-  \"HotelitoFunction\": {" >> $JSON_FILE
+echo "{" >> $JSON_FILE
 
-while IFS='=' read -r key value
+
+
+# Add section for CallbackFunction
+echo "\"CallbackFunction\": {" >> $JSON_FILE
+
+while IFS='=' read -r key value || [[ -n "$key" ]]
 do
     if [ -z "$key" ] || [[ $key == \#* ]]; then
         # Skip empty lines and lines starting with #
@@ -56,5 +60,44 @@ else
 fi
 
 # Add closing brace to end JSON
-echo "  }
-}" >> $JSON_FILE
+echo "  }," >> $JSON_FILE
+# End CallbackFunction section
+
+
+#Add InitialAuthorizationFunction
+echo "\"InitialAuthorizationFunction\": {" >> $JSON_FILE
+
+while IFS='=' read -r key value || [[ -n "$key" ]]
+do
+    if [ -z "$key" ] || [[ $key == \#* ]]; then
+        # Skip empty lines and lines starting with #
+        continue
+    fi
+
+    # Remove quotes if they exist
+    value=${value%\"}
+    value=${value#\"}
+    # Escape special characters
+    value=${value//\\/\\\\}
+    value=${value//\"/\\\"}
+    # Write to JSON file
+    echo "    \"$key\": \"$value\"," >> $JSON_FILE
+done < "$ENV_FILE"
+
+# Remove last comma
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # Mac OSX
+    sed -i '' -e '$ s/,$//' "$JSON_FILE"
+else
+    # Linux
+    sed -i '$ s/,$//' "$JSON_FILE"
+fi
+
+# Add closing brace to end JSON
+echo "  }" >> $JSON_FILE
+# End InitialAuthorizationFunction section
+
+
+
+# Add final brace to end JSON
+echo "}" >> $JSON_FILE
