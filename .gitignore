@@ -2,4 +2,4 @@
 **/.tmp
 **/secrets.db
 dist/
-
+.idea/
