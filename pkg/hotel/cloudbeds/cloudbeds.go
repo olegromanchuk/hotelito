@@ -2,19 +2,21 @@ package cloudbeds
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/olegromanchuk/hotelito/pkg/hotel"
 	"github.com/olegromanchuk/hotelito/pkg/secrets"
-	"github.com/olegromanchuk/hotelito/pkg/secrets/boltstore"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"io"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
+	"time"
 )
 
 type Room struct {
@@ -31,10 +33,6 @@ type Room struct {
 	RoomCondition     string `json:"RoomCondition,omitempty"`
 	RoomOccupied      bool   `json:"RoomOccupied,omitempty"`
 }
-
-const (
-	oauthStateString = "random"
-)
 
 var (
 	oauthConf                  *oauth2.Config
@@ -217,9 +215,15 @@ func (p *Cloudbeds) GetRoom(roomNumber string) (hotel.Room, error) {
 // handleLogin helper function to handle login. Just redirect to oauth2 provider login page
 func (p *Cloudbeds) HandleManualLogin() (url string, err error) {
 	p.setOauth2Config()
+	oauthStateString := p.generateRandomString(10)
 	url = oauthConf.AuthCodeURL(oauthStateString)
 	if url == "" {
 		return url, fmt.Errorf("failed to retrieve oauth2 url. Check .env file and make sure that all variables related to CLOUDBEDS are set. Refer to .env_example")
+	}
+	//save "state" for future validation by the callback function
+	err = p.storeClient.StoreOauthState(oauthStateString)
+	if err != nil {
+		return "", err
 	}
 	return url, nil
 }
@@ -229,6 +233,7 @@ func (p *Cloudbeds) login(secretStore secrets.SecretsStore) (statusCodeMsg strin
 	if loginLoopPreventionCounter > 1 {
 		p.log.Debugf("Running login in a loop %d time", loginLoopPreventionCounter)
 	}
+	oauthStateString := p.generateRandomString(10) // adjust the length as per your needs
 
 	// try to retrieve refresh token from secret store
 	p.log.Debugf("Trying to retrieve refresh token from secret store")
@@ -241,6 +246,13 @@ func (p *Cloudbeds) login(secretStore secrets.SecretsStore) (statusCodeMsg strin
 		//call oauth2 login
 		p.setOauth2Config()
 		msg = fmt.Sprintln("No refresh token found. Please run this link in browser to login to Cloudbeds: ", oauthConf.AuthCodeURL(oauthStateString))
+		//save "state" for future validation by the callback function
+		err = p.storeClient.StoreOauthState(oauthStateString)
+		if err != nil {
+			errMsg := fmt.Sprintf("failed to store oauth state: %v", err)
+			p.log.Errorf(errMsg)
+			return "", ""
+		}
 		return "no-refresh-token-found", msg
 	}
 
@@ -303,11 +315,18 @@ func (p *Cloudbeds) refreshToken() error {
 	return nil
 }
 
-func (p *Cloudbeds) HandleCallback(state, code string) (err error) {
-	p.log.Debugf("Handling callback in cloudbeds")
+func (p *Cloudbeds) HandleOAuthCallback(state, code string) (err error) {
+	p.log.Debugf("Handling oauth callback in cloudbeds. State: %s, Code: %s", state, code)
+	oauthStateString, err := p.storeClient.RetrieveOauthState(state)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to retrieve oauth state from secret store: %v. Possibly state does not exist or stale. Try to login again", err.Error())
+		p.log.Debug(errMsg)
+		return errors.New(errMsg)
+	}
 	if state != oauthStateString {
-		p.log.Errorf("invalid oauth state, expected '%s', got '%s'", oauthStateString, state)
-		return fmt.Errorf("invalid oauth state, expected '%s', got '%s'\n", oauthStateString, state)
+		errMsg := fmt.Sprintf("invalid oauth state, expected '%s', got '%s'", oauthStateString, state)
+		p.log.Error(errMsg)
+		return errors.New(errMsg)
 	}
 
 	token, err := oauthConf.Exchange(context.Background(), code)
@@ -317,7 +336,7 @@ func (p *Cloudbeds) HandleCallback(state, code string) (err error) {
 	}
 	p.log.Debugf("Got access token of length: %d", len(token.AccessToken))
 
-	// get pre-authorized client for future requests
+	// get pre-authorized client for future requests (doesn't make a lot of sense for aws version)
 	p.httpClient = oauthConf.Client(context.Background(), token)
 
 	//save access and refresh token to secret store
@@ -334,7 +353,7 @@ func (p *Cloudbeds) HandleCallback(state, code string) (err error) {
 	return nil
 }
 
-func New(log *logrus.Logger) *Cloudbeds {
+func New(log *logrus.Logger, secretStore secrets.SecretsStore) *Cloudbeds {
 	log.Debugf("Creating new Cloudbeds client")
 	cloudbedsClient := &Cloudbeds{
 		log: log,
@@ -344,12 +363,7 @@ func New(log *logrus.Logger) *Cloudbeds {
 
 	//get access_token
 
-	//current secret store - boltDB
-	storeClient, err := boltstore.Initialize()
-	if err != nil {
-		log.Fatal(err)
-	}
-	cloudbedsClient.storeClient = storeClient
+	cloudbedsClient.storeClient = secretStore
 
 	//check if access_token is valid. If not - get refresh_token and update access_token
 	accessToken, err := cloudbedsClient.storeClient.RetrieveAccessToken()
@@ -365,6 +379,18 @@ func New(log *logrus.Logger) *Cloudbeds {
 		AccessToken: accessToken,
 	}
 	cloudbedsClient.httpClient = oauthConf.Client(context.Background(), token)
+
+	return cloudbedsClient
+}
+
+func NewClient4Callback(log *logrus.Logger, secretStore secrets.SecretsStore) *Cloudbeds {
+	log.Debugf("Creating new Cloudbeds client")
+	cloudbedsClient := &Cloudbeds{
+		log:         log,
+		storeClient: secretStore,
+	}
+	cloudbedsClient.refresher = cloudbedsClient //refresher is an interface! This feint with ears is needed to point refreshToken method to itself. Now call p.refresher.refreshToken() will call refreshToken method of Cloudbeds struct
+	//refresher was created as interface to make the code more testable
 
 	return cloudbedsClient
 }
@@ -490,4 +516,21 @@ func (p *Cloudbeds) setOauth2Config() {
 			TokenURL: os.Getenv("CLOUDBEDS_TOKEN_URL"),
 		},
 	}
+	//check that all env variables are set
+	if oauthConf.ClientID == "" || oauthConf.ClientSecret == "" || oauthConf.RedirectURL == "" || oauthConf.Scopes == nil || oauthConf.Endpoint.AuthURL == "" || oauthConf.Endpoint.TokenURL == "" {
+		p.log.Fatal("Not all required env variables are set. Missed one of: CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET, CLOUDBEDS_REDIRECT_URL, CLOUDBEDS_SCOPES, CLOUDBEDS_AUTH_URL, CLOUDBEDS_TOKEN_URL")
+	}
+}
+
+func (p *Cloudbeds) generateRandomString(length int) string {
+	bytes := make([]byte, length)
+	p.log.Debugf("Generating random string of length %d", length)
+	// Seed the random number generator with the current time
+	rand.Seed(time.Now().UnixNano())
+
+	if _, err := rand.Read(bytes); err != nil {
+		p.log.Fatal(err)
+	}
+	p.log.Debugf("Generated random string: %s", hex.EncodeToString(bytes))
+	return hex.EncodeToString(bytes)
 }

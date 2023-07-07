@@ -54,15 +54,9 @@ Note, that the server with the app should have a public **valid** HTTPS endpoint
  Set a correct redirect URL. It should be  
 `https://mypublic.api.address/api/v1/callback`
 
-2. You will need to update a configuration file with the credentials (.env)
-```
-CLOUDBEDS_CLIENT_ID=mycompanyexample_LuPCZsereqdqdXjS
-CLOUDBEDS_CLIENT_SECRET=haPpyjHKJujewnfw32SDDFFD
-CLOUDBEDS_REDIRECT_URL=https://mypublic.api.address/api/v1/callback
-CLOUDBEDS_SCOPES=read:reservation,write:reservation,read:room,write:room,read:housekeeping,write:housekeeping,read:item,write:item
-CLOUDBEDS_AUTH_URL=https://hotels.cloudbeds.com/api/v1.1/oauth
-CLOUDBEDS_TOKEN_URL=https://hotels.cloudbeds.com/api/v1.1/access_token
-```
+2. You will need to create a configuration file with the credentials (.env). Check .env_example for the list of required variables.  
+   PS. `APPLICATION_NAME` will be used to in AWS Parameter Store path.
+
 3. `CLOUDBEDS_REDIRECT_URL` should be set to the public IP address of the server plus "/api/v1/callback". On this URL Cloudbeds authentication server will send an authorization code as part of the authentication process [OAuth2](https://integrations.cloudbeds.com/hc/en-us/articles/360006450433-OAuth-2-0).
 
 #### 3CX
@@ -89,10 +83,20 @@ CLOUDBEDS_TOKEN_URL=https://hotels.cloudbeds.com/api/v1.1/access_token
 - then open, disable Call Journaling and save; 
 - then open again, enable Call Journaling and save.  
 It is needed to clear 3CX caching. Was discovered through numerous tests. If you just add/save a new template the old cached settings will be used.
+   
+6. Create IVR "clean" and "dirty". 
 
-TODO   
-6. Create IVR "clean" and "dirty".  
+7. Install the app.
 
+### Install standalone version
+
+- Install Hotelito by download the latest release from the [Releases](https://github.com/olegromanchuk/hotelito/releases) page.
+- Create .env file that will contain all the configuration parameters. See included .env_example.
+
+### Install AWS Lambda version
+
+- Create .env file that will contain all the configuration parameters. See included .env_example.
+- Run "setup_aws.sh". This script will create necessary parameters from .env in the AWS Parameter Store.
 
 ### Helpful links:
 #### Cloudbeds
@@ -108,19 +112,30 @@ TODO
 * [CRM Integration Wizard](https://www.3cx.com/docs/crm-integration/)
 
 
-## Deploy
+
+
+## Testing
 
 ### Local testing standalone
-cd hotelito
+```
 go build -o cmd/hotelito/hotelito cmd/hotelito/main.go
+echo "make sure that .env file is present in the current directory and contains all the required variables"
 ./cmd/hotelito/hotelito
+```
 
 ### Local testing AWS
-cd cloudbeds/
-env GOOS=linux go build -o cloudbeds
-cd ../
-sam local start-api
+```
+cd app/
+make build
+sam local invoke HotelitoFunction -e events/event_org.json --env-vars environmental_vars.json
+
+## option 2
+make build
+sam local start-api -e events/event_org.json --env-vars environmental_vars.json
+```
+`sam build` creates .aws-sam directory that is used for `sam local start-api`. Keep that in mind when running `sam local start-api`. If this directory doesn't exist the binary should exist in the directory when a source code is located. You MUST build the binary for Linux, as shown above. If the binary doesn't exist or was built for different architecture you will get an unclear error from sam.
 
 ## TODO
-[ ] makefile
-[ ] workflows
+[x] makefile  
+[x] workflows  
+[ ] add .env_example to releases
