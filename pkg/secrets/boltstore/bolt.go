@@ -91,6 +91,59 @@ func (s *BoltDBStore) RetrieveRefreshToken() (string, error) {
 	return token, nil
 }
 
+func (s *BoltDBStore) StoreOauthState(state string) error {
+	return s.Db.Update(func(tx *bolt.Tx) error {
+		bucket, err := tx.CreateBucketIfNotExists([]byte(state))
+		if err != nil {
+			return err
+		}
+
+		err = bucket.Put([]byte(state), []byte(state))
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+
+func (s *BoltDBStore) RetrieveOauthState(state string) (string, error) {
+	var token string
+	err := s.Db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte(state))
+		if bucket == nil {
+			return nil
+		}
+
+		tokenBytes := bucket.Get([]byte(state))
+		if tokenBytes == nil {
+			return nil
+		}
+
+		token = string(tokenBytes)
+		return nil
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	//clean up. Delete retrieved state
+	err = s.Db.Update(func(tx *bolt.Tx) error {
+		err := tx.DeleteBucket([]byte(state))
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	return token, nil
+}
+
 func Initialize() (*BoltDBStore, error) {
 	dbref, err := bolt.Open(dbFile, 0600, nil)
 	if err != nil {

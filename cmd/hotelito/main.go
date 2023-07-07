@@ -6,6 +6,7 @@ import (
 	"github.com/olegromanchuk/hotelito/internal/handlers"
 	"github.com/olegromanchuk/hotelito/pkg/hotel/cloudbeds"
 	"github.com/olegromanchuk/hotelito/pkg/pbx/pbx3cx"
+	"github.com/olegromanchuk/hotelito/pkg/secrets/boltstore"
 	"github.com/sirupsen/logrus"
 	"log"
 	"net/http"
@@ -23,13 +24,20 @@ func main() {
 
 	//define logger
 	log := logrus.New()
-	// The default level is info.
-	log.SetLevel(logrus.DebugLevel)
-	//log.SetReportCaller(true)
-	//log.AddHook(&callerHook{})
+	// The default level is debug.
+	logLevelEnv := os.Getenv("LOG_LEVEL")
+	if logLevelEnv == "" {
+		logLevelEnv = "debug"
+	}
+	logLevel, err := logrus.ParseLevel(logLevelEnv)
+	if err != nil {
+		logLevel = logrus.DebugLevel
+	}
+	log.SetLevel(logLevel)
 
 	// Set output of logs to Stdout
 	log.SetOutput(os.Stdout)
+	log.Infof("Log level: %s", logLevelEnv)
 
 	readAuthVarsFromFile()
 
@@ -39,8 +47,14 @@ func main() {
 
 	//   ---------------------- Cloudbed parts ----------------------
 
+	//current secret store - boltDB
+	storeClient, err := boltstore.Initialize()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	//create cloudbeds client
-	clbClient := cloudbeds.New(log)
+	clbClient := cloudbeds.New(log, storeClient)
 	defer clbClient.Close()
 
 	//create 3cx client
@@ -67,7 +81,12 @@ func main() {
 
 	http.Handle("/", api)
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	port := ":" + os.Getenv("PORT")
+	if port == ":" {
+		log.Warn("PORT env variable is not set. Using default port 8080")
+		port = ":8080"
+	}
+	log.Fatal(http.ListenAndServe(port, nil))
 }
 
 func readAuthVarsFromFile() {
