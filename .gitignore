@@ -3,4 +3,4 @@
 **/secrets.db
 **/environmental_vars.json
 dist/
-
+.idea/
