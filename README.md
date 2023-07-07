@@ -44,6 +44,7 @@ You can install the integration as:
 - Lambda function on AWS (preferred option)
 - on a dedicated server (better option) (valid public https is required)
 - as a standalone app installed directly on 3CX (not recommended)
+The process of the app installation described in the details [below](#install-standalone-version).
 
 #### Cloudbeds
 The Cloudbeds platform supports REST API integration. You need to enable [REST API](https://integrations.cloudbeds.com/hc/en-us/articles/360012140013-Property-and-Group-Account-API-Access) to be able to use this integration. Another option would be to install the app from the Cloudbeds Marketplace (not implemented yet).  
@@ -86,12 +87,13 @@ It is needed to clear 3CX caching. Was discovered through numerous tests. If you
    
 6. Create IVR "clean" and "dirty". 
 
-7. Install the app.
+7. Install the app (see below).
 
 ### Install standalone version
 
-- Install Hotelito by download the latest release from the [Releases](https://github.com/olegromanchuk/hotelito/releases) page.
+- Install Hotelito by downloading the latest release from the [Releases](https://github.com/olegromanchuk/hotelito/releases) page.
 - Create .env file that will contain all the configuration parameters. See included .env_example.
+- Create roomid_map.json file that will contain the list of room ID's and their extensions. See included roomid_map.json.
 
 ### Install AWS Lambda version
 
@@ -116,11 +118,17 @@ It is needed to clear 3CX caching. Was discovered through numerous tests. If you
 
 ## Testing
 
-### Local testing standalone
+### Local testing standalone on localhost
 ```
 go build -o cmd/hotelito/hotelito cmd/hotelito/main.go
 echo "make sure that .env file is present in the current directory and contains all the required variables"
 ./cmd/hotelito/hotelito
+```
+
+### Local testing standalone in docker
+```
+ docker build -t hotelito .
+ docker run --name hotelito -p 8080:8080 hotelito
 ```
 
 ### Local testing AWS
@@ -139,3 +147,5 @@ sam local start-api -e events/event_org.json --env-vars environmental_vars.json
 [x] makefile  
 [x] workflows  
 [ ] add .env_example to releases
+[ ] add roomid_map.json to releases
+[ ] make release in folder (so after tar -xvzf hotelito.tgz you will get a folder with all the files)
