@@ -81,7 +81,12 @@ func main() {
 
 	http.Handle("/", api)
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	port := ":" + os.Getenv("PORT")
+	if port == ":" {
+		log.Warn("PORT env variable is not set. Using default port 8080")
+		port = ":8080"
+	}
+	log.Fatal(http.ListenAndServe(port, nil))
 }
 
 func readAuthVarsFromFile() {
