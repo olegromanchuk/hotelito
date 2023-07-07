@@ -13,7 +13,7 @@
   <Authentication Type="No" />
   <Scenarios>
     <Scenario Id="" Type="REST">
-      <Request Url="https://8571-72-89-122-10.ngrok-free.app/api/v1/3cx/lookupbynumber?Number=[Number]&amp;CallDirection=[CallDirection]" MessagePasses="0" RequestEncoding="UrlEncoded" RequestType="Get" ResponseType="Json" />
+      <Request Url="https://076a-74-117-148-31.ngrok-free.app/api/v1/3cx/lookupbynumber?Number=[Number]&amp;CallDirection=[CallDirection]" MessagePasses="0" RequestEncoding="UrlEncoded" RequestType="Get" ResponseType="Json" />
       <Rules>
         <Rule Type="Any">contact.id</Rule>
       </Rules>
@@ -87,7 +87,7 @@
       </Outputs>
     </Scenario>
     <Scenario Id="ReportCall" Type="REST">
-      <Request SkipIf="[IIf([ReportCallEnabled]!=True||[EntityId]==&quot;&quot;,True,[IIf([CallType]!=Inbound,True,False)])]" Url="https://8571-72-89-122-10.ngrok-free.app/api/v1/3cx/outbound_call" MessagePasses="0" RequestContentType="application/json" RequestEncoding="Json" RequestType="Post" ResponseType="Json">
+      <Request SkipIf="[IIf([ReportCallEnabled]!=True||[EntityId]==&quot;&quot;,True,[IIf([CallType]!=Inbound,True,False)])]" Url="https://076a-74-117-148-31.ngrok-free.app/api/v1/3cx/outbound_call" MessagePasses="0" RequestContentType="application/json" RequestEncoding="Json" RequestType="Post" ResponseType="Json">
         <PostValues Key="">
           <Value Key="Number" Passes="1" Type="String">[Number]</Value>
           <Value Key="CallType" Passes="1" Type="String">[CallType]</Value>
@@ -111,7 +111,7 @@
       <Outputs Next="ReportCallOutbound" AllowEmpty="true" />
     </Scenario>
     <Scenario Id="ReportCallOutbound" Type="REST">
-      <Request SkipIf="[IIf([ReportCallEnabled]!=True||[EntityId]==&quot;&quot;,True,[IIf([CallType]!=Outbound,True,False)])]" Url="https://8571-72-89-122-10.ngrok-free.app/api/v1/3cx/outbound_call" MessagePasses="0" RequestContentType="application/json" RequestEncoding="Json" RequestType="Post" ResponseType="Json">
+      <Request SkipIf="[IIf([ReportCallEnabled]!=True||[EntityId]==&quot;&quot;,True,[IIf([CallType]!=Outbound,True,False)])]" Url="https://076a-74-117-148-31.ngrok-free.app/api/v1/3cx/outbound_call" MessagePasses="0" RequestContentType="application/json" RequestEncoding="Json" RequestType="Post" ResponseType="Json">
         <PostValues Key="">
           <Value Key="Number" Passes="1" Type="String">[Number]</Value>
           <Value Key="CallType" Passes="1" Type="String">[CallType]</Value>
@@ -126,7 +126,7 @@
       <Outputs Next="ReportCallNotanswered" AllowEmpty="true" />
     </Scenario>
     <Scenario Id="ReportCallNotanswered" Type="REST">
-      <Request SkipIf="[IIf([ReportCallEnabled]!=True||[EntityId]==&quot;&quot;,True,[IIf([CallType]!=Notanswered,True,False)])]" Url="https://8571-72-89-122-10.ngrok-free.app/api/v1/call" MessagePasses="0" RequestContentType="application/json" RequestEncoding="Json" RequestType="Post" ResponseType="Json">
+      <Request SkipIf="[IIf([ReportCallEnabled]!=True||[EntityId]==&quot;&quot;,True,[IIf([CallType]!=Notanswered,True,False)])]" Url="https://076a-74-117-148-31.ngrok-free.app/api/v1/call" MessagePasses="0" RequestContentType="application/json" RequestEncoding="Json" RequestType="Post" ResponseType="Json">
         <PostValues Key="">
           <Value Key="phone" Passes="1" Type="String">[Number]</Value>
         </PostValues>
