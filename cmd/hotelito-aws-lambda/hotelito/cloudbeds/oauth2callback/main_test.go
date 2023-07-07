@@ -1,4 +1,4 @@
-package oauth2callback
+package main
 
 import (
 	"testing"
