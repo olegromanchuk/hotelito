@@ -12,6 +12,12 @@ Globals:
     MemorySize: 128
 
 Resources:
+
+  MyBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: hotelito-app-3cxroomextension-cloudbedsroomid
+
   InitialAuthorizationFunction:
       Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
       Properties:
@@ -111,6 +117,14 @@ Resources:
             Properties:
               Path: /3cx/outbound_call
               Method: POST
+        Policies:
+                - Version: '2012-10-17'
+                  Statement:
+                    - Effect: Allow
+                      Action:
+                        - s3:GetObject
+                        - s3:PutObject
+                      Resource: !Sub arn:aws:s3:::hotelito-app-3cxroomextension-cloudbedsroomid/*
         Environment:
           Variables:
             ENVIRONMENT: ''

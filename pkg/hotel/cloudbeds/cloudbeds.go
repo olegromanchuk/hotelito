@@ -172,13 +172,13 @@ func (p *Cloudbeds) CancelReservation(reservationID string) error {
 	return nil
 }
 
-func (p *Cloudbeds) UpdateRoom(roomNumber, housekeepingStatus, housekeeperID string) (msg string, err error) {
+func (p *Cloudbeds) UpdateRoom(roomNumber, housekeepingStatus, housekeeperID string, mapFileName string) (msg string, err error) {
 	p.log.Debugf("Start UpdateRoom %s to %s", roomNumber, housekeepingStatus)
 
 	//get room id
 	room := &Room{}
 	room.PhoneNumber = roomNumber
-	roomID, err := room.SearchRoomIDByPhoneNumber(roomNumber, os.Getenv("CLOUDBEDS_PHONE2ROOM_MAP_FILENAME"))
+	roomID, err := room.SearchRoomIDByPhoneNumber(roomNumber, mapFileName)
 	if err != nil {
 		p.log.Error(err)
 		return msg, err
@@ -196,13 +196,13 @@ func (p *Cloudbeds) UpdateRoom(roomNumber, housekeepingStatus, housekeeperID str
 	return msg, nil
 }
 
-func (p *Cloudbeds) GetRoom(roomNumber string) (hotel.Room, error) {
+func (p *Cloudbeds) GetRoom(roomNumber string, mapFileName string) (hotel.Room, error) {
 	p.log.Infof("get info about room %s", roomNumber)
 
 	//get room id
 	room := &Room{}
 	room.PhoneNumber = roomNumber
-	roomID, err := room.SearchRoomIDByPhoneNumber(roomNumber, os.Getenv("CLOUDBEDS_PHONE2ROOM_MAP_FILENAME"))
+	roomID, err := room.SearchRoomIDByPhoneNumber(roomNumber, mapFileName)
 	if err != nil {
 		p.log.Error(err)
 		return room.ToHotelRoom(), err
