@@ -11,9 +11,44 @@ Globals:
     Timeout: 5
     MemorySize: 128
 
-Resources:
+Parameters:
+  Environment:
+    Type: String
+    Default: 'production'
+  ApplicationName:
+    Type: String
+    Default: 'hotelito-app'
+  LogLevel:
+    Type: String
+    Default: 'debug'
+  CloudBedsClientId:
+    Type: String
+    Default: ''
+  CloudBedsClientSecret:
+    Type: String
+    Default: ''
+  CloudBedsScopes:
+    Type: String
+    Default: 'read:reservation,write:reservation,read:room,write:room,read:housekeeping,write:housekeeping,read:item,write:item'
+  CloudBedsAuthUrl:
+    Type: String
+    Default: 'https://hotels.cloudbeds.com/api/v1.1/oauth'
+  CloudBedsTokenUrl:
+    Type: String
+    Default: 'https://hotels.cloudbeds.com/api/v1.1/access_token'
+  CloudBedsPhone2RoomMapFileName:
+    Type: String
+    Default: 'roomid_map.json'
+  Port:
+    Type: String
+    Default: '8080'
+  AwsBucketMap3CXRoomExtensionCloudBedsRoomId:
+    Type: String
+    Default: 'hotelito-app-3cxroomextension-cloudbedsroomid'
 
-  MyBucket:
+
+Resources:
+  BucketFor3CXRoomExtensionCloudbedsRoomIdMap:
       Type: AWS::S3::Bucket
       Properties:
         BucketName: hotelito-app-3cxroomextension-cloudbedsroomid
@@ -32,19 +67,20 @@ Resources:
             Properties:
               Path: /
               Method: GET
+        Policies:
+          - Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:PutParameter
+                  - ssm:GetParameter
+#                Resource: !Sub arn:aws:ssm:::parameter/hotelito-app/production/*
+                Resource: '*'
         Environment: # More info about Env Vars: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#environment-object
           Variables:
-            ENVIRONMENT: ''
-            APPLICATION_NAME: ''
-            LOG_LEVEL: ''
-            CLOUDBEDS_CLIENT_ID: ''
-            CLOUDBEDS_CLIENT_SECRET: ''
-            CLOUDBEDS_REDIRECT_URL: ''
-            CLOUDBEDS_SCOPES: ''
-            CLOUDBEDS_AUTH_URL: ''
-            CLOUDBEDS_TOKEN_URL: ''
-            CLOUDBEDS_PHONE2ROOM_MAP_FILENAME: ''
-            AWS_REGION: ''
+            ENVIRONMENT: !Ref Environment
+            APPLICATION_NAME: !Ref ApplicationName
+            LOG_LEVEL: !Ref LogLevel
 
 
   CallbackFunction:
@@ -63,17 +99,9 @@ Resources:
             Method: GET
       Environment: # More info about Env Vars: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#environment-object
         Variables:
-          ENVIRONMENT: ''
-          APPLICATION_NAME: ''
-          LOG_LEVEL: ''
-          CLOUDBEDS_CLIENT_ID: ''
-          CLOUDBEDS_CLIENT_SECRET: ''
-          CLOUDBEDS_REDIRECT_URL: ''
-          CLOUDBEDS_SCOPES: ''
-          CLOUDBEDS_AUTH_URL: ''
-          CLOUDBEDS_TOKEN_URL: ''
-          CLOUDBEDS_PHONE2ROOM_MAP_FILENAME: ''
-          AWS_REGION: ''
+            ENVIRONMENT: !Ref Environment
+            APPLICATION_NAME: !Ref ApplicationName
+            LOG_LEVEL: !Ref LogLevel
 
   3CXLookupByNumberFunction:
     Type: AWS::Serverless::Function
@@ -91,17 +119,9 @@ Resources:
             Method: GET
       Environment:
         Variables:
-          ENVIRONMENT: ''
-          APPLICATION_NAME: ''
-          LOG_LEVEL: ''
-          CLOUDBEDS_CLIENT_ID: ''
-          CLOUDBEDS_CLIENT_SECRET: ''
-          CLOUDBEDS_REDIRECT_URL: ''
-          CLOUDBEDS_SCOPES: ''
-          CLOUDBEDS_AUTH_URL: ''
-          CLOUDBEDS_TOKEN_URL: ''
-          CLOUDBEDS_PHONE2ROOM_MAP_FILENAME: ''
-          AWS_REGION: ''
+            ENVIRONMENT: !Ref Environment
+            APPLICATION_NAME: !Ref ApplicationName
+            LOG_LEVEL: !Ref LogLevel
 
   3CXOutboundCallFunction:
       Type: AWS::Serverless::Function
@@ -127,17 +147,9 @@ Resources:
                       Resource: !Sub arn:aws:s3:::hotelito-app-3cxroomextension-cloudbedsroomid/*
         Environment:
           Variables:
-            ENVIRONMENT: ''
-            APPLICATION_NAME: ''
-            LOG_LEVEL: ''
-            CLOUDBEDS_CLIENT_ID: ''
-            CLOUDBEDS_CLIENT_SECRET: ''
-            CLOUDBEDS_REDIRECT_URL: ''
-            CLOUDBEDS_SCOPES: ''
-            CLOUDBEDS_AUTH_URL: ''
-            CLOUDBEDS_TOKEN_URL: ''
-            CLOUDBEDS_PHONE2ROOM_MAP_FILENAME: ''
-            AWS_REGION: ''
+            ENVIRONMENT: !Ref Environment
+            APPLICATION_NAME: !Ref ApplicationName
+            LOG_LEVEL: !Ref LogLevel
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function

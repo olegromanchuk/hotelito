@@ -1,5 +1,7 @@
 .PHONY: build
 
+AWS_CONFIG_PROFILE=$$(grep 'profile' ./samconfig.toml | awk -F '"' '{print $$2}' | cut -d'"' -f 1)
+
 build-all:
 	./sync_environmental_vars.sh
 	rm -rf .aws-sam
@@ -11,7 +13,7 @@ build-cb:
 	sam build CallbackFunction
 
 invoke-cb:
-	sam local invoke CallbackFunction -e events/event_org.json --env-vars environmental_vars.json
+	sam local invoke --profile $(AWS_CONFIG_PROFILE) CallbackFunction -e events/event_org.json --env-vars environmental_vars.json
 run-cb: build-cb invoke-cb
 
 build-init:
@@ -19,7 +21,9 @@ build-init:
 	rm -rf .aws-sam
 	sam build InitialAuthorizationFunction
 invoke-init:
-	sam local invoke InitialAuthorizationFunction -e events/event_init.json --env-vars environmental_vars.json
+	sam local invoke --profile $(AWS_CONFIG_PROFILE) InitialAuthorizationFunction -e events/event_init.json --env-vars environmental_vars.json
+debug-init:
+	sam local invoke --profile $(AWS_CONFIG_PROFILE) -d 5986 InitialAuthorizationFunction -e events/event_init.json --debugger-path=/Users/xxot/go/bin/linux_amd64 --env-vars environmental_vars.json --debug-args="-delveAPI=2"
 run-init: build-init invoke-init
 
 build-3cxlookup:
@@ -27,7 +31,7 @@ build-3cxlookup:
 	rm -rf .aws-sam
 	sam build 3CXLookupByNumberFunction
 invoke-3cxlookup:
-	sam local invoke 3CXLookupByNumberFunction -e events/event_lookup.json --env-vars environmental_vars.json
+	sam local invoke --profile $(AWS_CONFIG_PROFILE) 3CXLookupByNumberFunction -e events/event_lookup.json --env-vars environmental_vars.json
 run-lookup: build-3cxlookup invoke-3cxlookup
 
 build-3cxcall:
@@ -35,8 +39,11 @@ build-3cxcall:
 	rm -rf .aws-sam
 	sam build 3CXOutboundCallFunction
 invoke-3cxcall:
-	sam local invoke 3CXOutboundCallFunction -e events/event_3cx_call.json --env-vars environmental_vars.json
+	sam local invoke --profile $(AWS_CONFIG_PROFILE) 3CXOutboundCallFunction -e events/event_3cx_call.json --env-vars environmental_vars.json
 run-3cxcall: build-3cxcall invoke-3cxcall
 
 install:
 	#create roomid_map.json in S3 bucket
+deploy-demo: build-all
+	#go test -v ./...
+	./deploy_aws.sh

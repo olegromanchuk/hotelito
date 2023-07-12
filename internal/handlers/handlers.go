@@ -26,7 +26,7 @@ func NewHandler(log *logrus.Logger, pbx pbx.PBXProvider, hotel hotel.Hospitality
 }
 
 func (h *Handler) HandleManualLogin(w http.ResponseWriter, r *http.Request) {
-	url, err := h.Hotel.HandleManualLogin()
+	url, err := h.Hotel.HandleInitialLogin()
 	if err != nil {
 		h.Log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/olegromanchuk/hotelito/pkg/hotel"
+	"github.com/olegromanchuk/hotelito/pkg/secrets"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -20,6 +21,50 @@ type MockHTTPClient struct {
 
 type MockTokenRefresher struct {
 	mock.Mock
+}
+
+type MockSecretsStore struct {
+	mock.Mock
+}
+
+func (m *MockSecretsStore) StoreAccessToken(token string) error {
+	args := m.Called(token)
+	return args.Error(0)
+}
+
+func (m *MockSecretsStore) StoreRefreshToken(token string) error {
+	args := m.Called(token)
+	return args.Error(0)
+}
+
+func (m *MockSecretsStore) RetrieveAccessToken() (string, error) {
+	args := m.Called()
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockSecretsStore) RetrieveRefreshToken() (string, error) {
+	args := m.Called()
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockSecretsStore) StoreOauthState(state string) error {
+	args := m.Called(state)
+	return args.Error(0)
+}
+
+func (m *MockSecretsStore) RetrieveOauthState(state string) (string, error) {
+	args := m.Called(state)
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockSecretsStore) RetrieveVar(varName string) (varValue string, err error) {
+	args := m.Called(varName)
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockSecretsStore) Close() error {
+	args := m.Called()
+	return args.Error(0)
 }
 
 func (m *MockTokenRefresher) refreshToken() error {
@@ -332,7 +377,7 @@ func TestRoom_SearchRoomIDByPhoneNumber(t *testing.T) {
 func TestCloudbeds_postHousekeepingStatus(t *testing.T) {
 
 	mockRefresher := new(MockTokenRefresher)
-	mockRefresher.On("refreshToken").Return(nil)
+	mockRefresher.On("refreshToken").Return("", nil)
 
 	/*type UpdateRoomConditionResponse struct {
 		Success bool `json:"success"`
@@ -442,3 +487,79 @@ func TestCloudbeds_postHousekeepingStatus(t *testing.T) {
 //		})
 //	}
 //}
+
+// Add your test cases
+func TestCloudbeds_setOauth2Config(t *testing.T) {
+
+	// Create a mock SecretStore
+	mockSecretStore := new(MockSecretsStore)
+	mockSecretStore.On("RetrieveVar").Return("", nil)
+
+	//set env variables to satisfy the testable function
+	keys := []string{
+		"CLOUDBEDS_CLIENT_ID",
+		"CLOUDBEDS_CLIENT_SECRET",
+		"CLOUDBEDS_REDIRECT_URL",
+		"CLOUDBEDS_AUTH_URL",
+		"CLOUDBEDS_TOKEN_URL",
+		"CLOUDBEDS_SCOPES",
+	}
+
+	//set env variables
+	os.Setenv("CLOUDBEDS_CLIENT_ID", "test_client_id")
+	os.Setenv("CLOUDBEDS_CLIENT_SECRET", "test_client_secret")
+	os.Setenv("CLOUDBEDS_REDIRECT_URL", "test_redirect_url")
+	os.Setenv("CLOUDBEDS_AUTH_URL", "test_auth_url")
+	os.Setenv("CLOUDBEDS_TOKEN_URL", "test_token_url")
+	os.Setenv("CLOUDBEDS_SCOPES", "test_scopes")
+
+	type fields struct {
+		httpClient  HTTPClient
+		storeClient secrets.SecretsStore
+		log         *logrus.Logger
+		refresher   TokenRefresher
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name: "success",
+			fields: fields{
+				httpClient:  &MockHTTPClient{},
+				storeClient: mockSecretStore,
+				log:         logrus.New(),
+				refresher:   &MockTokenRefresher{},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "error",
+			fields: fields{
+				httpClient:  &MockHTTPClient{},
+				storeClient: &MockSecretsStore{},
+				log:         logrus.New(),
+				refresher:   &MockTokenRefresher{},
+			},
+			wantErr: assert.Error,
+		},
+	}
+	for _, tt := range tests {
+		if tt.name == "error" {
+			// Unset env variables after the "success" test case
+			for _, key := range keys {
+				os.Unsetenv(key)
+			}
+		}
+		t.Run(tt.name, func(t *testing.T) {
+			p := &Cloudbeds{
+				httpClient:  tt.fields.httpClient,
+				storeClient: tt.fields.storeClient,
+				log:         tt.fields.log,
+				refresher:   tt.fields.refresher,
+			}
+			tt.wantErr(t, p.setOauth2Config(), fmt.Sprintf("setOauth2Config()"))
+		})
+	}
+}

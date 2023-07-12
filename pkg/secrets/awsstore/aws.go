@@ -5,6 +5,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ssm"
+	"github.com/sirupsen/logrus"
+	"strings"
 )
 
 type AWSSecretsStore struct {
@@ -12,6 +14,7 @@ type AWSSecretsStore struct {
 	RefreshTokenParamName string
 	AWSSession            *session.Session
 	StorePrefix           string
+	Log                   *logrus.Logger
 }
 
 func (s *AWSSecretsStore) StoreAccessToken(token string) error {
@@ -80,7 +83,7 @@ func (s *AWSSecretsStore) RetrieveRefreshToken() (string, error) {
 
 func (s *AWSSecretsStore) StoreOauthState(state string) error {
 	ssmSvc := ssm.New(s.AWSSession)
-
+	s.Log.Debugf("Storing state %s", state)
 	//get full name including app name and environment type
 	fullParamName := fmt.Sprintf("/%s/%s", s.StorePrefix, state)
 
@@ -92,6 +95,9 @@ func (s *AWSSecretsStore) StoreOauthState(state string) error {
 	}
 
 	_, err := ssmSvc.PutParameter(input)
+	if err != nil {
+		s.Log.Errorf("Error storing state %s", err.Error())
+	}
 	return err
 }
 
@@ -124,6 +130,37 @@ func (s *AWSSecretsStore) RetrieveOauthState(state string) (string, error) {
 	}
 
 	return value, nil
+}
+
+func (s *AWSSecretsStore) RetrieveVar(varName string) (varValue string, err error) {
+	ssmSvc := ssm.New(s.AWSSession)
+
+	//get full name including app name and environment type
+	fullParamName := fmt.Sprintf("/%s/%s", s.StorePrefix, varName)
+
+	input := &ssm.GetParameterInput{
+		Name:           aws.String(fullParamName),
+		WithDecryption: aws.Bool(true),
+	}
+
+	result, err := ssmSvc.GetParameter(input)
+	if err != nil {
+		return "", err
+	}
+
+	//remove quotes
+	var resultString string
+	resultRaw := *result.Parameter.Value
+	//check if string is quoted and strip if yes
+	if strings.HasPrefix(resultRaw, "\"") {
+		resultString = strings.Trim(resultRaw, "\"")
+		s.Log.Tracef("Retrieved %s", resultString)
+		return resultString, nil
+	}
+	resultString = resultRaw
+
+	s.Log.Tracef("Retrieved %s", resultString)
+	return resultString, nil
 }
 
 func Initialize(storePrefix string, awsRegion string) (*AWSSecretsStore, error) {

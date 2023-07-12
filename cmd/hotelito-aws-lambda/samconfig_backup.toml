@@ -4,7 +4,6 @@ version = 0.1
 
 [default]
 [default.global.parameters]
-stack_name = "hotelito-go1.x"
 
 [default.build.parameters]
 cached = true
@@ -17,6 +16,12 @@ lint = true
 capabilities = "CAPABILITY_IAM"
 confirm_changeset = true
 resolve_s3 = true
+stack_name = "hotelito-go1"
+s3_prefix = "hotelito-go1"
+region = "us-east-2"
+profile = "demo-3cx-account"
+disable_rollback = false
+image_repositories = []
 
 [default.package.parameters]
 resolve_s3 = true

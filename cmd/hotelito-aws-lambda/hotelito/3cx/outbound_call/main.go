@@ -69,7 +69,7 @@ func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayPro
 	}
 
 	//create cloudbeds client
-	clbClient := cloudbeds.NewClient4Callback(log, storeClient)
+	clbClient := cloudbeds.NewClient4CallbackAndInit(log, storeClient)
 
 	//option via handler interface. Helpful for testing
 	//create 3cx client

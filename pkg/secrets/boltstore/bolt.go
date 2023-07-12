@@ -144,6 +144,29 @@ func (s *BoltDBStore) RetrieveOauthState(state string) (string, error) {
 	return token, nil
 }
 
+func (s *BoltDBStore) RetrieveVar(varName string) (varValue string, err error) {
+	err = s.Db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte(bucketName))
+		if bucket == nil {
+			return nil
+		}
+
+		varValueBytes := bucket.Get([]byte(varName))
+		if varValueBytes == nil {
+			return nil
+		}
+
+		varValue = string(varValueBytes)
+		return nil
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	return varValue, nil
+}
+
 func Initialize() (*BoltDBStore, error) {
 	dbref, err := bolt.Open(dbFile, 0600, nil)
 	if err != nil {

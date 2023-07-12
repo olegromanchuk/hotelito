@@ -7,5 +7,6 @@ type SecretsStore interface {
 	RetrieveRefreshToken() (string, error)
 	StoreOauthState(state string) error
 	RetrieveOauthState(state string) (string, error)
+	RetrieveVar(varName string) (varValue string, err error)
 	Close() error
 }

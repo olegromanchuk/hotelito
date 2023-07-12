@@ -24,11 +24,13 @@ func main() {
 
 	//define logger
 	log := logrus.New()
+
 	// The default level is debug.
 	logLevelEnv := os.Getenv("LOG_LEVEL")
 	if logLevelEnv == "" {
 		logLevelEnv = "debug"
 	}
+
 	logLevel, err := logrus.ParseLevel(logLevelEnv)
 	if err != nil {
 		logLevel = logrus.DebugLevel

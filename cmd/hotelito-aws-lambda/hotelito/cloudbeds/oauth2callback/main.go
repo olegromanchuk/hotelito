@@ -60,7 +60,7 @@ func HandleCallback(ctx context.Context, request events.APIGatewayProxyRequest) 
 	}
 
 	//create cloudbeds client
-	clbClient := cloudbeds.NewClient4Callback(log, storeClient)
+	clbClient := cloudbeds.NewClient4CallbackAndInit(log, storeClient)
 
 	// exctract state and code from request
 	log.Debugf("Handling callback")
