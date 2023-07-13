@@ -10,6 +10,7 @@ all: test build
 
 build:
 	cd cmd/hotelito && go build -o ../../bin/hotelito
+	./create_3cx_template.sh
 
 release:
 	@echo release

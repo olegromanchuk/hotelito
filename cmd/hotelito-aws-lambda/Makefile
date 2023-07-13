@@ -13,7 +13,9 @@ build-cb:
 	sam build CallbackFunction
 
 invoke-cb:
-	sam local invoke --profile $(AWS_CONFIG_PROFILE) CallbackFunction -e events/event_org.json --env-vars environmental_vars.json
+	sam local invoke --profile $(AWS_CONFIG_PROFILE) CallbackFunction -e events/events_oauthcallback.json --env-vars environmental_vars.json
+debug-cb:
+	sam local invoke --profile $(AWS_CONFIG_PROFILE) -d 5986 CallbackFunction -e events/events_oauthcallback.json --debugger-path=/Users/xxot/go/bin/linux_amd64 --env-vars environmental_vars.json --debug-args="-delveAPI=2"
 run-cb: build-cb invoke-cb
 
 build-init:
