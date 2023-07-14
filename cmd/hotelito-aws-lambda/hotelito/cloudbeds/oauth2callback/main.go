@@ -30,11 +30,10 @@ func HandleCallback(ctx context.Context, request events.APIGatewayProxyRequest) 
 
 	//custom formatter will add caller name to the logging
 	//generate random log record ID
-	var traceID string
-	traceID = logging.GenerateTraceID()
+	traceID := logging.GenerateTraceID()
 
 	if logLevel >= 5 { //Debug or Trace level
-		log.Formatter = &logging.CustomFormatter{&logrus.TextFormatter{}, traceID}
+		log.Formatter = &logging.CustomFormatter{CustomFormatter: &logrus.TextFormatter{}, TraceID: traceID}
 	}
 
 	log.SetLevel(logLevel)

@@ -42,7 +42,7 @@ func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayPro
 	traceID := request.RequestContext.RequestID
 
 	if logLevel >= 5 { //Debug or Trace level
-		log.Formatter = &logging.CustomFormatter{&logrus.TextFormatter{}, traceID}
+		log.Formatter = &logging.CustomFormatter{CustomFormatter: &logrus.TextFormatter{}, TraceID: traceID}
 	}
 
 	log.SetLevel(logLevel)
@@ -85,6 +85,14 @@ func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayPro
 		//get from awsstore if localenv is empty
 		log.Debug("AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID env variable is not set. Trying store")
 		awsBucketName, err = storeClient.RetrieveVar("AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID")
+		if err != nil {
+			errMsg := fmt.Sprintf("failed to retrieve AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID from store: %v", err)
+			log.Error(errMsg)
+			return events.APIGatewayProxyResponse{
+				StatusCode: http.StatusInternalServerError,
+				Body:       errMsg,
+			}, nil
+		}
 	}
 	log.Debugf("AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID: %s", awsBucketName)
 	log.Debugf("Fetching roomid_map.json from S3 bucket %s", awsBucketName)
@@ -120,7 +128,7 @@ func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayPro
 	if request.IsBase64Encoded {
 		decoded, err := base64.StdEncoding.DecodeString(body)
 		if err != nil {
-			// handle err
+			log.Errorf("Error decoding base64 string: %v", err)
 		}
 		body = string(decoded)
 	}

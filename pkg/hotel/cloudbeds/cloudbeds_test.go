@@ -565,7 +565,7 @@ func TestCloudbeds_setOauth2Config(t *testing.T) {
 				log:         tt.fields.log,
 				refresher:   tt.fields.refresher,
 			}
-			tt.wantErr(t, p.setOauth2Config(), fmt.Sprintf("setOauth2Config()"))
+			tt.wantErr(t, p.setOauth2Config(), "setOauth2Config()")
 		})
 	}
 }

@@ -33,7 +33,7 @@ func HandleInit(ctx context.Context, request events.APIGatewayProxyRequest) (eve
 	//custom formatter will add caller name to the logging
 	traceID := logging.GenerateTraceID()
 	if logLevel >= 5 { //Debug or Trace level
-		log.Formatter = &logging.CustomFormatter{&logrus.TextFormatter{}, traceID}
+		log.Formatter = &logging.CustomFormatter{CustomFormatter: &logrus.TextFormatter{}, TraceID: traceID}
 	}
 
 	log.SetLevel(logLevel)

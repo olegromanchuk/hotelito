@@ -119,17 +119,14 @@ func (s *AWSSecretsStore) RetrieveOauthState(state string) (string, error) {
 	}
 
 	//remove quotes
-	var resultString string
 	resultRaw := *result.Parameter.Value
+	resultString := resultRaw
 	//check if string is quoted and strip if yes
 	if strings.HasPrefix(resultRaw, "\"") {
 		resultString = strings.Trim(resultRaw, "\"")
-		s.Log.Tracef("Retrieved %s", resultString)
+		s.Log.Tracef("Retrieved %s", resultRaw)
 		return resultString, nil
 	}
-	resultString = resultRaw
-
-	value := *result.Parameter.Value
 
 	//clean up. Delete retrieved state
 	s.Log.Tracef("Deleting state %s", fullParamName)
@@ -142,7 +139,7 @@ func (s *AWSSecretsStore) RetrieveOauthState(state string) (string, error) {
 		return "", err
 	}
 
-	return value, nil
+	return resultString, nil
 }
 
 func (s *AWSSecretsStore) RetrieveVar(varName string) (varValue string, err error) {
