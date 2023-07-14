@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/olegromanchuk/hotelito/internal/logging"
 	"github.com/olegromanchuk/hotelito/pkg/hotel/cloudbeds"
 	"github.com/olegromanchuk/hotelito/pkg/secrets/awsstore"
 	"github.com/sirupsen/logrus"
@@ -14,7 +15,7 @@ import (
 )
 
 func HandleCallback(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	fmt.Print(request)
+	fmt.Println(request)
 	//define logger
 	log := logrus.New()
 	// The default level is debug.
@@ -26,6 +27,16 @@ func HandleCallback(ctx context.Context, request events.APIGatewayProxyRequest) 
 	if err != nil {
 		logLevel = logrus.DebugLevel
 	}
+
+	//custom formatter will add caller name to the logging
+	//generate random log record ID
+	var traceID string
+	traceID = logging.GenerateTraceID()
+
+	if logLevel >= 5 { //Debug or Trace level
+		log.Formatter = &logging.CustomFormatter{&logrus.TextFormatter{}, traceID}
+	}
+
 	log.SetLevel(logLevel)
 	log.SetOutput(os.Stdout)
 	log.Infof("Log level: %s", logLevelEnv)
@@ -54,15 +65,22 @@ func HandleCallback(ctx context.Context, request events.APIGatewayProxyRequest) 
 
 	storePrefix := fmt.Sprintf("%s/%s", appName, environmentType) //hotelito-app-production
 	//current secret store - aws env variables
-	storeClient, err := awsstore.Initialize(storePrefix, awsRegion)
+	storeClient, err := awsstore.Initialize(log, storePrefix, awsRegion)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	//create cloudbeds client
-	clbClient := cloudbeds.NewClient4CallbackAndInit(log, storeClient)
+	clbClient, err := cloudbeds.NewClient4CallbackAndInit(log, storeClient)
+	if err != nil {
+		log.Errorf("Error creating cloudbeds client: %v", err)
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       fmt.Sprintf("Error: %v", err),
+		}, nil
+	}
 
-	// exctract state and code from request
+	// extract state and code from request
 	log.Debugf("Handling callback")
 	state := request.QueryStringParameters["state"]
 	code := request.QueryStringParameters["code"]
@@ -85,6 +103,7 @@ func HandleCallback(ctx context.Context, request events.APIGatewayProxyRequest) 
 
 	return events.APIGatewayProxyResponse{
 		StatusCode: http.StatusOK,
+		Body:       "Success",
 	}, nil
 }
 

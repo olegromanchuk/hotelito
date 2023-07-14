@@ -178,7 +178,7 @@ func (p *Cloudbeds) UpdateRoom(roomNumber, housekeepingStatus, housekeeperID str
 	//get room id
 	room := &Room{}
 	room.PhoneNumber = roomNumber
-	roomID, err := room.SearchRoomIDByPhoneNumber(roomNumber, mapFileName)
+	roomID, err := room.SearchRoomIDByPhoneNumber(p.log, roomNumber, mapFileName)
 	if err != nil {
 		p.log.Error(err)
 		return msg, err
@@ -202,7 +202,7 @@ func (p *Cloudbeds) GetRoom(roomNumber string, mapFileName string) (hotel.Room, 
 	//get room id
 	room := &Room{}
 	room.PhoneNumber = roomNumber
-	roomID, err := room.SearchRoomIDByPhoneNumber(roomNumber, mapFileName)
+	roomID, err := room.SearchRoomIDByPhoneNumber(p.log, roomNumber, mapFileName)
 	if err != nil {
 		p.log.Error(err)
 		return room.ToHotelRoom(), err
@@ -356,27 +356,33 @@ func (p *Cloudbeds) HandleOAuthCallback(state, code string) (err error) {
 	err = p.storeClient.StoreAccessToken(token.AccessToken)
 	if err != nil {
 		p.log.Error(err)
+		return err
 	}
 	p.log.Debugf("Saving refresh token to secret store")
 	err = p.storeClient.StoreRefreshToken(token.RefreshToken)
 	if err != nil {
 		p.log.Error(err)
+		return err
 	}
 	return nil
 }
 
-func New(log *logrus.Logger, secretStore secrets.SecretsStore) *Cloudbeds {
+func New(log *logrus.Logger, secretStore secrets.SecretsStore) (*Cloudbeds, error) {
 	log.Debugf("Creating new Cloudbeds client")
 	cloudbedsClient := &Cloudbeds{
-		log:       log,
-		oauthConf: &oauth2.Config{},
+		log:         log,
+		oauthConf:   &oauth2.Config{},
+		storeClient: secretStore,
+	}
+	err := cloudbedsClient.setOauth2Config()
+	if err != nil {
+		log.Error(err)
+		return nil, err
 	}
 	cloudbedsClient.refresher = cloudbedsClient //refresher is an interface! This feint with ears is needed to point refreshToken method to itself. Now call p.refresher.refreshToken() will call refreshToken method of Cloudbeds struct
 	//refresher was created as interface to make the code more testable
 
 	//get access_token
-
-	cloudbedsClient.storeClient = secretStore
 
 	//check if access_token is valid. If not - get refresh_token and update access_token
 	accessToken, err := cloudbedsClient.storeClient.RetrieveAccessToken()
@@ -393,10 +399,10 @@ func New(log *logrus.Logger, secretStore secrets.SecretsStore) *Cloudbeds {
 	}
 	cloudbedsClient.httpClient = cloudbedsClient.oauthConf.Client(context.Background(), token)
 
-	return cloudbedsClient
+	return cloudbedsClient, nil
 }
 
-func NewClient4CallbackAndInit(log *logrus.Logger, secretStore secrets.SecretsStore) *Cloudbeds {
+func NewClient4CallbackAndInit(log *logrus.Logger, secretStore secrets.SecretsStore) (*Cloudbeds, error) {
 	log.Debugf("Creating new Cloudbeds client")
 	cloudbedsClient := &Cloudbeds{
 		log:         log,
@@ -405,7 +411,12 @@ func NewClient4CallbackAndInit(log *logrus.Logger, secretStore secrets.SecretsSt
 	cloudbedsClient.refresher = cloudbedsClient //refresher is an interface! This feint with ears is needed to point refreshToken method to itself. Now call p.refresher.refreshToken() will call refreshToken method of Cloudbeds struct
 	//refresher was created as interface to make the code more testable
 
-	return cloudbedsClient
+	err := cloudbedsClient.setOauth2Config()
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	return cloudbedsClient, nil
 }
 
 func (p *Cloudbeds) Close() error {
@@ -486,11 +497,12 @@ func (p *Cloudbeds) postHousekeepingStatus(roomID string, roomCondition string) 
 	return nil
 }
 
-func (r *Room) SearchRoomIDByPhoneNumber(phoneNumber string, mapFileName string) (string, error) {
+func (r *Room) SearchRoomIDByPhoneNumber(log *logrus.Logger, phoneNumber string, mapFileName string) (string, error) {
 	type RoomMap map[string]string
 	// Read file
 	jsonFile, err := os.Open(mapFileName)
 	if err != nil {
+		log.Error(err)
 		return "", err
 	}
 	defer jsonFile.Close()
@@ -503,13 +515,17 @@ func (r *Room) SearchRoomIDByPhoneNumber(phoneNumber string, mapFileName string)
 	// Unmarshal the JSON data into the map
 	err = json.Unmarshal(byteValue, &roomMap)
 	if err != nil {
+		log.Error(err)
 		return "", err
 	}
 
 	// Look up room ID by phone number
+	log.Tracef("Looking up room ID by phone number %s", phoneNumber)
 	roomID, ok := roomMap[phoneNumber]
 	if !ok {
-		return "", fmt.Errorf("phone number not found")
+		errMsg := fmt.Sprintf("phone number %s not found", phoneNumber)
+		log.Error(errMsg)
+		return "", errors.New(errMsg)
 	}
 
 	return roomID, nil
@@ -520,6 +536,7 @@ func (p *Cloudbeds) setOauth2Config() error {
 	p.log.Debugf("Setting oauth2 config")
 
 	//first - trying to get vars from secretStore. If no luck - try from env
+	//if no luck again - return error
 
 	scopes := strings.Split(p.getVarFromStoreOrEnvironment("CLOUDBEDS_SCOPES"), ",")
 
@@ -546,10 +563,14 @@ func (p *Cloudbeds) setOauth2Config() error {
 
 // getVarFromStoreOrEnvironment returns variable from secret store or environment if store is empty
 func (p *Cloudbeds) getVarFromStoreOrEnvironment(varName string) (result string) {
+	p.log.Tracef("Getting variable '%s' from store or environment", varName)
 	result, err := p.storeClient.RetrieveVar(varName)
 	if err != nil || result == "" {
 		result = os.Getenv(varName)
 		p.log.Debugf("The store is empty. Got variable '%s' from environment. Result: '%s'", varName, result)
+		if err != nil {
+			p.log.Errorf("Got error while trying to get variable '%s' from environment: %s", varName, err)
+		}
 		return
 	}
 	p.log.Debugf("Got variable '%s' from store. Result: '%s'", varName, result)
@@ -560,6 +581,7 @@ func (p *Cloudbeds) generateRandomString(length int) string {
 	bytes := make([]byte, length)
 	p.log.Debugf("Generating random string of length %d", length)
 	// Seed the random number generator with the current time
+	//
 	rand.Seed(time.Now().UnixNano())
 
 	if _, err := rand.Read(bytes); err != nil {

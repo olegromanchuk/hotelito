@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/olegromanchuk/hotelito/internal/handlers"
+	"github.com/olegromanchuk/hotelito/internal/logging"
 	"github.com/olegromanchuk/hotelito/pkg/hotel/cloudbeds"
 	"github.com/olegromanchuk/hotelito/pkg/pbx/pbx3cx"
 	"github.com/olegromanchuk/hotelito/pkg/secrets/awsstore"
@@ -23,7 +25,7 @@ import (
 )
 
 func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	fmt.Print(request)
+	fmt.Println(request)
 	//define logger
 	log := logrus.New()
 	// The default level is debug.
@@ -35,6 +37,14 @@ func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayPro
 	if err != nil {
 		logLevel = logrus.DebugLevel
 	}
+
+	//custom formatter will add caller name to the logging
+	traceID := request.RequestContext.RequestID
+
+	if logLevel >= 5 { //Debug or Trace level
+		log.Formatter = &logging.CustomFormatter{&logrus.TextFormatter{}, traceID}
+	}
+
 	log.SetLevel(logLevel)
 	log.SetOutput(os.Stdout)
 	log.Infof("Log level: %s", logLevelEnv)
@@ -61,15 +71,44 @@ func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayPro
 	}
 	log.Debugf("AWS_REGION: %s", awsRegion)
 
+	//AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID - see below
+
 	storePrefix := fmt.Sprintf("%s/%s", appName, environmentType) //hotelito-app-production
 	//current secret store - aws env variables
-	storeClient, err := awsstore.Initialize(storePrefix, awsRegion)
+	storeClient, err := awsstore.Initialize(log, storePrefix, awsRegion)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	awsBucketName := os.Getenv("AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID")
+	if awsBucketName == "" {
+		//get from awsstore if localenv is empty
+		log.Debug("AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID env variable is not set. Trying store")
+		awsBucketName, err = storeClient.RetrieveVar("AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID")
+	}
+	log.Debugf("AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID: %s", awsBucketName)
+	log.Debugf("Fetching roomid_map.json from S3 bucket %s", awsBucketName)
+	//get information about mapping: room extension -- cloudbeds room ID
+	//fetchS3ObjectAndSaveToFile is a helper function to fetch object from S3 and save it to file
+	mapFullFileName, err := fetchS3ObjectAndSaveToFile(log, awsBucketName, "roomid_map.json") // Replace with your bucket name and the file name
+	if err != nil || mapFullFileName == "" {
+		errMsg := fmt.Sprintf("failed to fetch object: %v. Check if AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID is set and S3 bucket with roomid_map.json exists", err)
+		log.Error(errMsg)
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       errMsg,
+		}, nil
+	}
+
 	//create cloudbeds client
-	clbClient := cloudbeds.NewClient4CallbackAndInit(log, storeClient)
+	clbClient, err := cloudbeds.New(log, storeClient)
+	if err != nil {
+		log.Errorf("Error creating cloudbeds client: %v", err)
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       fmt.Sprintf("Error: %v", err),
+		}, nil
+	}
 
 	//option via handler interface. Helpful for testing
 	//create 3cx client
@@ -112,19 +151,7 @@ func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayPro
 	//get provider
 	hotelProvider := h.Hotel
 
-	//get information about mapping: room extension -- cloudbeds room ID
-	//fetchS3ObjectAndSaveToFile is a helper function to fetch object from S3 and save it to file
-	err = fetchS3ObjectAndSaveToFile(os.Getenv("AWS_BUCKET_MAP_3CXROOMEXTENSION_CLOUDBEDSROOMID"), "roomid_map.json") // Replace with your bucket name and the file name
-	if err != nil {
-		errMsg := fmt.Sprintf("failed to fetch object: %v. Check if AWS_BUCKET_MAP_3CXROOMEXTENSION_CLOUDBEDSROOMID is set and S3 bucket with roomid_map.json exists", err)
-		log.Debug(errMsg)
-		return events.APIGatewayProxyResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       errMsg,
-		}, nil
-	}
-
-	msg, err := hotelProvider.UpdateRoom(room.PhoneNumber, room.RoomCondition, room.HouskeeperID, "roomid_map.json")
+	msg, err := hotelProvider.UpdateRoom(room.PhoneNumber, room.RoomCondition, room.HouskeeperID, mapFullFileName)
 	if err != nil {
 		h.Log.Error(err)
 		return events.APIGatewayProxyResponse{
@@ -141,34 +168,40 @@ func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayPro
 }
 
 // fetchS3ObjectAndSaveToFile is a helper function to fetch object from S3 and save it to file
-func fetchS3ObjectAndSaveToFile(bucket, fileName string) error {
+func fetchS3ObjectAndSaveToFile(log *logrus.Logger, bucket, fileName string) (filename string, err error) {
 
 	sess, err := session.NewSession(&aws.Config{
 		Region: aws.String(os.Getenv("AWS_REGION"))},
 	)
 
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	downloader := s3manager.NewDownloader(sess)
-
-	file, err := os.Create("roomid_map.json") //save file to current directory. Exists only for current lambda execution
+	log.Tracef("Downloading %s from bucket %s", fileName, bucket)
+	file, err := os.Create("/tmp/roomid_map.json") //save file to current directory. Exists only for current lambda execution
 	if err != nil {
-		return fmt.Errorf("Unable to open empty file %q for writing - %v", fileName, err)
+		errMsg := fmt.Sprintf("Unable to open file %q for writing - %v", fileName, err)
+		log.Error(errMsg)
+		return "", errors.New(errMsg)
 	}
 
 	defer file.Close()
 
-	_, err = downloader.Download(file,
+	bytesDownloaded, err := downloader.Download(file,
 		&s3.GetObjectInput{
 			Bucket: aws.String(bucket),
 			Key:    aws.String(fileName),
 		})
 	if err != nil {
-		return fmt.Errorf("Unable to download and save the file %q from bucket %q - %v", fileName, bucket, err)
+		errMsg := fmt.Sprintf("Unable to download item %q, %v", fileName, err)
+		log.Error(errMsg)
+		return "", errors.New(errMsg)
 	}
-	return nil
+	fullFileName := fmt.Sprintf("/tmp/%s", fileName)
+	log.Tracef("Stored to %s from bucket %s, %d bytes", fullFileName, bucket, bytesDownloaded)
+	return fullFileName, nil
 }
 
 func main() {

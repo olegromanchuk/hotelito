@@ -4,6 +4,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"github.com/olegromanchuk/hotelito/internal/handlers"
+	"github.com/olegromanchuk/hotelito/internal/logging"
 	"github.com/olegromanchuk/hotelito/pkg/hotel/cloudbeds"
 	"github.com/olegromanchuk/hotelito/pkg/pbx/pbx3cx"
 	"github.com/olegromanchuk/hotelito/pkg/secrets/boltstore"
@@ -22,6 +23,9 @@ func loggingMiddleware(next http.Handler) http.Handler {
 
 func main() {
 
+	//load env variables
+	readAuthVarsFromFile()
+
 	//define logger
 	log := logrus.New()
 
@@ -35,13 +39,18 @@ func main() {
 	if err != nil {
 		logLevel = logrus.DebugLevel
 	}
+
+	//custom formatter will add caller name to the logging
+	traceID := logging.GenerateTraceID()
+	if logLevel >= 5 { //Debug or Trace level
+		log.Formatter = &logging.CustomFormatter{&logrus.TextFormatter{}, traceID}
+	}
+
 	log.SetLevel(logLevel)
 
 	// Set output of logs to Stdout
 	log.SetOutput(os.Stdout)
 	log.Infof("Log level: %s", logLevelEnv)
-
-	readAuthVarsFromFile()
 
 	r := mux.NewRouter()
 	api := r.PathPrefix("/api/v1").Subrouter()
@@ -56,7 +65,10 @@ func main() {
 	}
 
 	//create cloudbeds client
-	clbClient := cloudbeds.New(log, storeClient)
+	clbClient, err := cloudbeds.New(log, storeClient)
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer clbClient.Close()
 
 	//create 3cx client

@@ -21,28 +21,13 @@ Parameters:
   LogLevel:
     Type: String
     Default: 'debug'
-  CloudBedsClientId:
-    Type: String
-    Default: ''
-  CloudBedsClientSecret:
-    Type: String
-    Default: ''
-  CloudBedsScopes:
-    Type: String
-    Default: 'read:reservation,write:reservation,read:room,write:room,read:housekeeping,write:housekeeping,read:item,write:item'
-  CloudBedsAuthUrl:
-    Type: String
-    Default: 'https://hotels.cloudbeds.com/api/v1.1/oauth'
-  CloudBedsTokenUrl:
-    Type: String
-    Default: 'https://hotels.cloudbeds.com/api/v1.1/access_token'
-  CloudBedsPhone2RoomMapFileName:
-    Type: String
-    Default: 'roomid_map.json'
-  Port:
-    Type: String
-    Default: '8080'
-  AwsBucketMap3CXRoomExtensionCloudBedsRoomId:
+    AllowedValues:
+          - error
+          - warn
+          - info
+          - debug
+          - trace
+  S3BucketMap3CXRoomExtClBedsRoomId:
     Type: String
     Default: 'hotelito-app-3cxroomextension-cloudbedsroomid'
 
@@ -65,7 +50,7 @@ Resources:
           GetInitialAuthorization:
             Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
             Properties:
-              Path: /
+              Path: /api/v1/
               Method: GET
         Policies:
           - Version: '2012-10-17'
@@ -74,8 +59,7 @@ Resources:
                 Action:
                   - ssm:PutParameter
                   - ssm:GetParameter
-#                Resource: !Sub arn:aws:ssm:::parameter/hotelito-app/production/*
-                Resource: '*'
+                Resource: !Sub 'arn:aws:ssm:${AWS::Region}:*:parameter/${ApplicationName}/${Environment}/*'
         Environment: # More info about Env Vars: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#environment-object
           Variables:
             ENVIRONMENT: !Ref Environment
@@ -95,8 +79,17 @@ Resources:
         GetCallback:
           Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
           Properties:
-            Path: /callback
+            Path: /api/v1/callback
             Method: GET
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - ssm:PutParameter
+                - ssm:DeleteParameter
+                - ssm:GetParameter
+              Resource: !Sub 'arn:aws:ssm:${AWS::Region}:*:parameter/${ApplicationName}/${Environment}/*'
       Environment: # More info about Env Vars: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#environment-object
         Variables:
             ENVIRONMENT: !Ref Environment
@@ -115,8 +108,17 @@ Resources:
         GetLookupByNumber:
           Type: Api
           Properties:
-            Path: /3cx/lookupbynumber
+            Path: /api/v1/3cx/lookupbynumber
             Method: GET
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+                - ssm:PutParameter
+                - ssm:DeleteParameter
+              Resource: !Sub 'arn:aws:ssm:${AWS::Region}:*:parameter/${ApplicationName}/${Environment}/*'
       Environment:
         Variables:
             ENVIRONMENT: !Ref Environment
@@ -135,21 +137,30 @@ Resources:
           PostOutboundCall:
             Type: Api
             Properties:
-              Path: /3cx/outbound_call
+              Path: /api/v1/3cx/outbound_call
               Method: POST
         Policies:
-                - Version: '2012-10-17'
-                  Statement:
-                    - Effect: Allow
-                      Action:
-                        - s3:GetObject
-                        - s3:PutObject
-                      Resource: !Sub arn:aws:s3:::hotelito-app-3cxroomextension-cloudbedsroomid/*
+              - Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - s3:GetObject
+                      - s3:PutObject
+                    Resource: !Sub 'arn:aws:s3:::${S3BucketMap3CXRoomExtClBedsRoomId}/*'
+              - Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - ssm:GetParameter
+                      - ssm:PutParameter
+                      - ssm:DeleteParameter
+                    Resource: !Sub 'arn:aws:ssm:${AWS::Region}:*:parameter/${ApplicationName}/${Environment}/*'
         Environment:
           Variables:
             ENVIRONMENT: !Ref Environment
             APPLICATION_NAME: !Ref ApplicationName
             LOG_LEVEL: !Ref LogLevel
+            AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID: !Ref S3BucketMap3CXRoomExtClBedsRoomId
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function

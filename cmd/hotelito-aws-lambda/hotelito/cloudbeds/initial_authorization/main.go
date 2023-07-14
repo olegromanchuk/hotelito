@@ -31,8 +31,9 @@ func HandleInit(ctx context.Context, request events.APIGatewayProxyRequest) (eve
 	}
 
 	//custom formatter will add caller name to the logging
+	traceID := logging.GenerateTraceID()
 	if logLevel >= 5 { //Debug or Trace level
-		log.Formatter = &logging.CustomFormatter{&logrus.TextFormatter{}}
+		log.Formatter = &logging.CustomFormatter{&logrus.TextFormatter{}, traceID}
 	}
 
 	log.SetLevel(logLevel)
@@ -63,14 +64,21 @@ func HandleInit(ctx context.Context, request events.APIGatewayProxyRequest) (eve
 
 	storePrefix := fmt.Sprintf("%s/%s", appName, environmentType) //hotelito-app-production
 	//current secret store - aws env variables
-	storeClient, err := awsstore.Initialize(storePrefix, awsRegion)
+	storeClient, err := awsstore.Initialize(log, storePrefix, awsRegion)
 	if err != nil {
 		log.Fatal(err)
 	}
 	storeClient.Log = log //set logger for store client
 
 	//create cloudbeds client
-	clbClient := cloudbeds.NewClient4CallbackAndInit(log, storeClient)
+	clbClient, err := cloudbeds.NewClient4CallbackAndInit(log, storeClient)
+	if err != nil {
+		log.Errorf("Error creating cloudbeds client: %v", err)
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       fmt.Sprintf("Error: %v", err),
+		}, nil
+	}
 
 	log.Debugf("Handling init")
 

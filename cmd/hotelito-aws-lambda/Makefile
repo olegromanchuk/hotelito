@@ -41,7 +41,9 @@ build-3cxcall:
 	rm -rf .aws-sam
 	sam build 3CXOutboundCallFunction
 invoke-3cxcall:
-	sam local invoke --profile $(AWS_CONFIG_PROFILE) 3CXOutboundCallFunction -e events/event_3cx_call.json --env-vars environmental_vars.json
+	sam local invoke --profile $(AWS_CONFIG_PROFILE) 3CXOutboundCallFunction -e events/events_outboundcall.json --env-vars environmental_vars.json
+debug-3cxcall:
+	sam local invoke --profile $(AWS_CONFIG_PROFILE) -d 5986 3CXOutboundCallFunction -e events/events_outboundcall.json --debugger-path=/Users/xxot/go/bin/linux_amd64 --env-vars environmental_vars.json --debug-args="-delveAPI=2"
 run-3cxcall: build-3cxcall invoke-3cxcall
 
 install:

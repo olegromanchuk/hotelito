@@ -262,6 +262,7 @@ func TestCloudbeds_GetRooms(t *testing.T) {
 
 func TestRoom_SearchRoomIDByPhoneNumber(t *testing.T) {
 
+	log := logrus.New()
 	// Setup: create roomid_map.json file
 	roomMapData := `{
 		"100": "544559-0",
@@ -359,7 +360,7 @@ func TestRoom_SearchRoomIDByPhoneNumber(t *testing.T) {
 				RoomCondition:     tt.fields.RoomCondition,
 				RoomOccupied:      tt.fields.RoomOccupied,
 			}
-			got, err := r.SearchRoomIDByPhoneNumber(tt.args.phoneNumber, "roomid_map_test.json")
+			got, err := r.SearchRoomIDByPhoneNumber(log, tt.args.phoneNumber, "roomid_map_test.json")
 			if !tt.wantErr(t, err, fmt.Sprintf("SearchRoomIDByPhoneNumber(%v)", tt.args.phoneNumber)) {
 				return
 			}
@@ -493,7 +494,12 @@ func TestCloudbeds_setOauth2Config(t *testing.T) {
 
 	// Create a mock SecretStore
 	mockSecretStore := new(MockSecretsStore)
-	mockSecretStore.On("RetrieveVar").Return("", nil)
+	mockSecretStore.On("RetrieveVar", "CLOUDBEDS_SCOPES").Return("", nil)
+	mockSecretStore.On("RetrieveVar", "CLOUDBEDS_CLIENT_ID").Return("", nil)
+	mockSecretStore.On("RetrieveVar", "CLOUDBEDS_CLIENT_SECRET").Return("", nil)
+	mockSecretStore.On("RetrieveVar", "CLOUDBEDS_REDIRECT_URL").Return("", nil)
+	mockSecretStore.On("RetrieveVar", "CLOUDBEDS_AUTH_URL").Return("", nil)
+	mockSecretStore.On("RetrieveVar", "CLOUDBEDS_TOKEN_URL").Return("", nil)
 
 	//set env variables to satisfy the testable function
 	keys := []string{
@@ -538,7 +544,7 @@ func TestCloudbeds_setOauth2Config(t *testing.T) {
 			name: "error",
 			fields: fields{
 				httpClient:  &MockHTTPClient{},
-				storeClient: &MockSecretsStore{},
+				storeClient: mockSecretStore,
 				log:         logrus.New(),
 				refresher:   &MockTokenRefresher{},
 			},
