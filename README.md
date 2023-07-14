@@ -173,6 +173,7 @@ To add new function follow the next steps:
 
 
 ## TODO
-[x] makefile  
+[x] makefile
 [x] workflows
 [x] TODO moved to GH Issues
+[x] workflows
