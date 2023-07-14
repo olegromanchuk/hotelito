@@ -94,12 +94,18 @@ It is needed to clear 3CX caching. Was discovered through numerous tests. If you
 - Install Hotelito by downloading the latest release from the [Releases](https://github.com/olegromanchuk/hotelito/releases) page.
 - Create .env file that will contain all the configuration parameters. See included .env_example.
 - Create roomid_map.json file that will contain the list of room ID's and their extensions. See included roomid_map.json.
+For more details see GH-15 (issue #15).
 
 ### Install AWS Lambda version
+
+#### !!! Important note for AWS Lambda version !!!
+If you decide to remove the app from AWS Lambda, make sure to remove all the parameters from AWS Parameter Store. Otherwise, they will be left there and will be accessible to anyone who has access to your AWS account.
+All other components will be removed automatically as soon as you remove stack from CloudFormation.
 
 - Create .env file that will contain all the configuration parameters. See included .env_example.
 - `cd cmd/hotelito-aws-lambda`
 - Run "setup_aws.sh". This script will create necessary parameters from .env in the AWS Parameter Store.
+- Run `sam deploy --guided`. This will create a CloudFormation stack with all the necessary components.
 
 ### Helpful links:
 #### Cloudbeds
@@ -153,11 +159,21 @@ sam local invoke HotelitoFunction -e events/event_org.json --env-vars environmen
 make build
 sam local start-api -e events/event_org.json --env-vars environmental_vars.json
 ```
-`sam build` creates .aws-sam directory that is used for `sam local start-api`. Keep that in mind when running `sam local start-api`. If this directory doesn't exist the binary should exist in the directory when a source code is located. You MUST build the binary for Linux, as shown above. If the binary doesn't exist or was built for different architecture you will get an unclear error from sam.
+`sam build` creates .aws-sam directory that is used for `sam local start-api`. Keep that in mind when running `sam local start-api`. If this directory doesn't exist the binary should exist in the directory when a source code is located. You MUST build the binary for Linux, as shown above. If the binary doesn't exist or was built for different architecture you will get an unclear error from sam.  
+`sam local generate-event apigateway aws-proxy --method POST --body '{"Number": "2222222501", "CallType": "Outbound", "CallDirection": "Outbound", "Name": "ExampleName", "Agent": "501", "AgentFirstName": "ExampleAgentFirstName", "DateTime": "2023-07-07T14:15:22Z"}' --path '3cx/outbound_call' > events/event_3cx_call.json`
+
+##### Consideration about aws parameter store:
+The decision to create parameter store variables in a bash script "deploy aws", not in a template.yaml was made because of the following reason: AWS does not support creating secureString in template.yml
+
+### New function
+To add new function follow the next steps:
+1. create a file with handler function in proper directory
+2. add section to template.yaml. Set function name (3CXOutboundCallFunction) , CodeUri, Events->Properties->Path, Events->Properties->Method
+3. add new section in sync_environmental_vars.sh. Search for the section called "All functions must be added here"
+
 
 ## TODO
-[x] makefile  
-[x] workflows  
-[ ] add .env_example to releases
-[ ] add roomid_map.json to releases
-[ ] make release in folder (so after tar -xvzf hotelito.tgz you will get a folder with all the files)
+[x] makefile
+[x] workflows
+[x] TODO moved to GH Issues
+[x] workflows
