@@ -5,11 +5,11 @@
   "httpMethod": "GET",
   "isBase64Encoded": false,
   "queryStringParameters": {
-    "state": "ok",
-    "code": "1234"
+    "Number": "212-850-6666",
+    "CallDirection": "O"
   },
   "pathParameters": {
-    "proxy": "/"
+    "proxy": "/3cx/lookupbynumber"
   },
   "stageVariables": {
     "baz": "qux"
@@ -54,7 +54,7 @@
       "userAgent": "Custom User Agent String",
       "user": null
     },
-    "path": "/prod/",
+    "path": "/prod/3cx/lookupbynumber",
     "resourcePath": "/{proxy+}",
     "httpMethod": "GET",
     "apiId": "1234567890",

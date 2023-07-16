@@ -70,3 +70,28 @@ func (pbx3cx *PBX3CX) processOutboundCall(requestBody RequestBody) (room pbx.Roo
 	}
 	return room, nil
 }
+
+func (pbx3cx *PBX3CX) ProcessLookupByNumber(number string) (bodyAsBytes []byte, err error) {
+	type Contact struct {
+		ID          int    `json:"id"`
+		FirstName   string `json:"firstname"`
+		Company     string `json:"company"`
+		MobilePhone string `json:"mobilephone"`
+	}
+	contact := Contact{
+		ID:          12345,
+		FirstName:   "testFirstName",
+		Company:     "testCompany",
+		MobilePhone: number,
+	}
+
+	returnStruct := struct {
+		Contact Contact `json:"contact"`
+	}{Contact: contact}
+
+	bodyAsBytes, err = json.Marshal(returnStruct)
+	if err != nil {
+		return bodyAsBytes, err
+	}
+	return bodyAsBytes, nil
+}

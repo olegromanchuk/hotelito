@@ -1,0 +1,43 @@
+{
+  "httpMethod": "GET",
+  "headers": {
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Accept-Language": "en-US,en;q=0.9,ru;q=0.8",
+    "CloudFront-Forwarded-Proto": "https",
+    "CloudFront-Is-Desktop-Viewer": "true",
+    "CloudFront-Is-Mobile-Viewer": "false",
+    "CloudFront-Is-SmartTV-Viewer": "false",
+    "CloudFront-Is-Tablet-Viewer": "false",
+    "CloudFront-Viewer-Country": "US",
+    "Host": "ss.execute-api.us-east-2.amazonaws.com",
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+    "Via": "2.0 sada.cloudfront.net (CloudFront)",
+    "X-Amz-Cf-Id": "asddsa==",
+    "X-Amzn-Trace-Id": "Root=1-64aeee77-asd",
+    "X-Forwarded-For": "",
+    "X-Forwarded-Port": "443",
+    "X-Forwarded-Proto": "https",
+    "sec-ch-ua": "\"Not.A/Brand\";v=\"8\", \"Chromium\";v=\"114\", \"Google Chrome\";v=\"114\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"macOS\"",
+    "sec-fetch-dest": "document",
+    "sec-fetch-mode": "navigate",
+    "sec-fetch-site": "cross-site",
+    "sec-fetch-user": "?1",
+    "upgrade-insecure-requests": "1"
+  },
+  "queryStringParameters": {
+    "code": "fe32dfsfaf3f23fsdfasdf23f",
+    "state": "dsafsf23f3wfewfq3w"
+  },
+  "path": "/callback",
+  "pathParameters": {},
+  "requestContext": {
+    "resourcePath": "/Prod/callback",
+    "httpMethod": "GET",
+    "requestTime": "12/Jul/2023:18:18:31 +0000",
+    "requestId": "2ee9276e-24cd-40d8-a4a2-2f46b0ff5fff"
+  },
+  "body": null
+}

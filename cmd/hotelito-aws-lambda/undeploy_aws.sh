@@ -1,4 +1,9 @@
 #!/bin/bash
+set -o errexit
+#This script will read the .env file, samconfig.toml and delete the parameters in the AWS Parameter Store
+
+# get the AWS profile from the samconfig.toml file
+AWS_CONFIG_PROFILE=$(grep 'profile' samconfig.toml | awk -F '"' '{print $2}' | cut -d'"' -f 1)
 
 # Initialize the path prefix with a default value
 path_prefix="/hotelito-app"
@@ -32,7 +37,7 @@ while read line; do
       export APP_NAME="${value}"
     fi
     if [ "$name" == "ENVIRONMENT" ]; then
-      path_prefix_env="/${value}"
+      path_prefix_env="${value}"
       export ENVIRONMENT="${value}"
     fi
     if [ "$name" == "LOG_LEVEL" ]; then
@@ -51,10 +56,7 @@ while read line; do
 
     # create or update the parameter in the Parameter Store
     echo "Setting ${path_prefix}/${path_prefix_env}/${name}"
-    aws ssm put-parameter \
-      --name "${path_prefix}/${path_prefix_env}/${name}" \
-      --type "SecureString" \
-      --value "${value}" \
-      --overwrite
+    aws --profile ${AWS_CONFIG_PROFILE} ssm delete-parameter \
+      --name "${path_prefix}/${path_prefix_env}/${name}"
   fi
 done <${ENV_FILE}

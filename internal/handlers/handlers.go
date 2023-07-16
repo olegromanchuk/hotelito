@@ -8,6 +8,7 @@ import (
 	"github.com/olegromanchuk/hotelito/pkg/pbx"
 	"github.com/sirupsen/logrus"
 	"net/http"
+	"os"
 )
 
 type Handler struct {
@@ -25,7 +26,7 @@ func NewHandler(log *logrus.Logger, pbx pbx.PBXProvider, hotel hotel.Hospitality
 }
 
 func (h *Handler) HandleManualLogin(w http.ResponseWriter, r *http.Request) {
-	url, err := h.Hotel.HandleManualLogin()
+	url, err := h.Hotel.HandleInitialLogin()
 	if err != nil {
 		h.Log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -82,7 +83,7 @@ func (h *Handler) Handle3cxCallInfo(w http.ResponseWriter, r *http.Request) {
 
 	//get provider
 	hotelProvider := h.Hotel
-	msg, err := hotelProvider.UpdateRoom(room.PhoneNumber, room.RoomCondition, room.HouskeeperID)
+	msg, err := hotelProvider.UpdateRoom(room.PhoneNumber, room.RoomCondition, room.HouskeeperID, os.Getenv("CLOUDBEDS_PHONE2ROOM_MAP_FILENAME"))
 	if err != nil {
 		h.Log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -105,24 +106,7 @@ func (h *Handler) Handle3cxLookup(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	number := query.Get("Number")
 
-	type Contact struct {
-		ID          int    `json:"id"`
-		FirstName   string `json:"firstname"`
-		Company     string `json:"company"`
-		MobilePhone string `json:"mobilephone"`
-	}
-	contact := Contact{
-		ID:          12345,
-		FirstName:   "testFirstName",
-		Company:     "testCompany",
-		MobilePhone: number,
-	}
-
-	returnStruct := struct {
-		Contact Contact `json:"contact"`
-	}{Contact: contact}
-
-	js, err := json.Marshal(returnStruct)
+	jsonAsBytes, err := h.PBX.ProcessLookupByNumber(number)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -130,7 +114,7 @@ func (h *Handler) Handle3cxLookup(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	_, err = w.Write(js)
+	_, err = w.Write(jsonAsBytes)
 	if err != nil {
 		h.Log.Error(err)
 		return
@@ -151,7 +135,7 @@ func (h *Handler) HandleSetHousekeepingStatus(w http.ResponseWriter, r *http.Req
 
 	h.Log.Debugf("roomPhoneNumber: %s, housekeepingStatus: %s, housekeeperID: %s", roomPhoneNumber, housekeepingStatus, housekeeperID)
 	hotelProvider := h.Hotel
-	msg, err := hotelProvider.UpdateRoom(roomPhoneNumber, housekeepingStatus, housekeeperID)
+	msg, err := hotelProvider.UpdateRoom(roomPhoneNumber, housekeepingStatus, housekeeperID, os.Getenv("CLOUDBEDS_PHONE2ROOM_MAP_FILENAME"))
 	if err != nil {
 		h.Log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)

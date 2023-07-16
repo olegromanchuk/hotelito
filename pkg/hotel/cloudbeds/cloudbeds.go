@@ -35,7 +35,6 @@ type Room struct {
 }
 
 var (
-	oauthConf                  *oauth2.Config
 	loginLoopPreventionCounter = 1
 )
 
@@ -51,6 +50,7 @@ type Cloudbeds struct {
 	storeClient secrets.SecretsStore
 	log         *logrus.Logger
 	refresher   TokenRefresher
+	oauthConf   *oauth2.Config
 }
 
 // TokenRefresher is needed for mocking http requests in tests. This is the only reason to create this interface. Cloudbeds implements this interface
@@ -172,13 +172,13 @@ func (p *Cloudbeds) CancelReservation(reservationID string) error {
 	return nil
 }
 
-func (p *Cloudbeds) UpdateRoom(roomNumber, housekeepingStatus, housekeeperID string) (msg string, err error) {
+func (p *Cloudbeds) UpdateRoom(roomNumber, housekeepingStatus, housekeeperID string, mapFileName string) (msg string, err error) {
 	p.log.Debugf("Start UpdateRoom %s to %s", roomNumber, housekeepingStatus)
 
 	//get room id
 	room := &Room{}
 	room.PhoneNumber = roomNumber
-	roomID, err := room.SearchRoomIDByPhoneNumber(roomNumber, os.Getenv("CLOUDBEDS_PHONE2ROOM_MAP_FILENAME"))
+	roomID, err := room.SearchRoomIDByPhoneNumber(p.log, roomNumber, mapFileName)
 	if err != nil {
 		p.log.Error(err)
 		return msg, err
@@ -196,13 +196,13 @@ func (p *Cloudbeds) UpdateRoom(roomNumber, housekeepingStatus, housekeeperID str
 	return msg, nil
 }
 
-func (p *Cloudbeds) GetRoom(roomNumber string) (hotel.Room, error) {
+func (p *Cloudbeds) GetRoom(roomNumber string, mapFileName string) (hotel.Room, error) {
 	p.log.Infof("get info about room %s", roomNumber)
 
 	//get room id
 	room := &Room{}
 	room.PhoneNumber = roomNumber
-	roomID, err := room.SearchRoomIDByPhoneNumber(roomNumber, os.Getenv("CLOUDBEDS_PHONE2ROOM_MAP_FILENAME"))
+	roomID, err := room.SearchRoomIDByPhoneNumber(p.log, roomNumber, mapFileName)
 	if err != nil {
 		p.log.Error(err)
 		return room.ToHotelRoom(), err
@@ -213,10 +213,14 @@ func (p *Cloudbeds) GetRoom(roomNumber string) (hotel.Room, error) {
 }
 
 // handleLogin helper function to handle login. Just redirect to oauth2 provider login page
-func (p *Cloudbeds) HandleManualLogin() (url string, err error) {
-	p.setOauth2Config()
+func (p *Cloudbeds) HandleInitialLogin() (url string, errReturn error) {
+	err := p.setOauth2Config()
+	if err != nil {
+		return "", err
+	}
 	oauthStateString := p.generateRandomString(10)
-	url = oauthConf.AuthCodeURL(oauthStateString)
+	url = p.oauthConf.AuthCodeURL(oauthStateString)
+	p.log.Debugf("got url for redirect %s", url)
 	if url == "" {
 		return url, fmt.Errorf("failed to retrieve oauth2 url. Check .env file and make sure that all variables related to CLOUDBEDS are set. Refer to .env_example")
 	}
@@ -244,8 +248,13 @@ func (p *Cloudbeds) login(secretStore secrets.SecretsStore) (statusCodeMsg strin
 
 	if refreshToken == "" {
 		//call oauth2 login
-		p.setOauth2Config()
-		msg = fmt.Sprintln("No refresh token found. Please run this link in browser to login to Cloudbeds: ", oauthConf.AuthCodeURL(oauthStateString))
+		err = p.setOauth2Config()
+		if err != nil {
+			errMsg := fmt.Sprintf("failed to set oauth2 config: %v", err)
+			p.log.Error(errMsg)
+			return "", "errMsg"
+		}
+		msg = fmt.Sprintln("No refresh token found. Please run this link in browser to login to Cloudbeds: ", p.oauthConf.AuthCodeURL(oauthStateString))
 		//save "state" for future validation by the callback function
 		err = p.storeClient.StoreOauthState(oauthStateString)
 		if err != nil {
@@ -262,7 +271,7 @@ func (p *Cloudbeds) login(secretStore secrets.SecretsStore) (statusCodeMsg strin
 		RefreshToken: refreshToken,
 	}
 
-	tokenSource := oauthConf.TokenSource(context.Background(), token)
+	tokenSource := p.oauthConf.TokenSource(context.Background(), token)
 	newToken, err := tokenSource.Token()
 	if err != nil {
 		p.log.Info("failed to get new access token. Looks like refresh token is stale. Clearing it and try to login again")
@@ -287,7 +296,10 @@ func (p *Cloudbeds) refreshToken() error {
 	p.log.Debugf("Trying to refresh token")
 
 	//call oauth2 data
-	p.setOauth2Config()
+	err := p.setOauth2Config()
+	if err != nil {
+		return err
+	}
 
 	refreshToken, err := p.storeClient.RetrieveRefreshToken()
 	if err != nil {
@@ -299,13 +311,13 @@ func (p *Cloudbeds) refreshToken() error {
 		RefreshToken: refreshToken,
 	}
 
-	tokenSource := oauthConf.TokenSource(context.Background(), token)
+	tokenSource := p.oauthConf.TokenSource(context.Background(), token)
 	newToken, err := tokenSource.Token()
 	if err != nil {
 		p.log.Info("failed to get new access token. Looks like refresh token is stale. Clearing it and try to login again")
 	}
 
-	p.httpClient = oauthConf.Client(context.Background(), token)
+	p.httpClient = p.oauthConf.Client(context.Background(), token)
 	err = p.storeClient.StoreAccessToken(newToken.AccessToken)
 	if err != nil {
 		return err
@@ -329,7 +341,7 @@ func (p *Cloudbeds) HandleOAuthCallback(state, code string) (err error) {
 		return errors.New(errMsg)
 	}
 
-	token, err := oauthConf.Exchange(context.Background(), code)
+	token, err := p.oauthConf.Exchange(context.Background(), code)
 	if err != nil {
 		p.log.Debugf("oauthConf.Exchange() failed with '%s'", err)
 		return fmt.Errorf("oauthConf.Exchange() failed with '%s'\n", err)
@@ -337,33 +349,40 @@ func (p *Cloudbeds) HandleOAuthCallback(state, code string) (err error) {
 	p.log.Debugf("Got access token of length: %d", len(token.AccessToken))
 
 	// get pre-authorized client for future requests (doesn't make a lot of sense for aws version)
-	p.httpClient = oauthConf.Client(context.Background(), token)
+	p.httpClient = p.oauthConf.Client(context.Background(), token)
 
 	//save access and refresh token to secret store
 	p.log.Debugf("Saving access token to secret store")
 	err = p.storeClient.StoreAccessToken(token.AccessToken)
 	if err != nil {
 		p.log.Error(err)
+		return err
 	}
 	p.log.Debugf("Saving refresh token to secret store")
 	err = p.storeClient.StoreRefreshToken(token.RefreshToken)
 	if err != nil {
 		p.log.Error(err)
+		return err
 	}
 	return nil
 }
 
-func New(log *logrus.Logger, secretStore secrets.SecretsStore) *Cloudbeds {
+func New(log *logrus.Logger, secretStore secrets.SecretsStore) (*Cloudbeds, error) {
 	log.Debugf("Creating new Cloudbeds client")
 	cloudbedsClient := &Cloudbeds{
-		log: log,
+		log:         log,
+		oauthConf:   &oauth2.Config{},
+		storeClient: secretStore,
+	}
+	err := cloudbedsClient.setOauth2Config()
+	if err != nil {
+		log.Error(err)
+		return nil, err
 	}
 	cloudbedsClient.refresher = cloudbedsClient //refresher is an interface! This feint with ears is needed to point refreshToken method to itself. Now call p.refresher.refreshToken() will call refreshToken method of Cloudbeds struct
 	//refresher was created as interface to make the code more testable
 
 	//get access_token
-
-	cloudbedsClient.storeClient = secretStore
 
 	//check if access_token is valid. If not - get refresh_token and update access_token
 	accessToken, err := cloudbedsClient.storeClient.RetrieveAccessToken()
@@ -378,12 +397,12 @@ func New(log *logrus.Logger, secretStore secrets.SecretsStore) *Cloudbeds {
 	token := &oauth2.Token{
 		AccessToken: accessToken,
 	}
-	cloudbedsClient.httpClient = oauthConf.Client(context.Background(), token)
+	cloudbedsClient.httpClient = cloudbedsClient.oauthConf.Client(context.Background(), token)
 
-	return cloudbedsClient
+	return cloudbedsClient, nil
 }
 
-func NewClient4Callback(log *logrus.Logger, secretStore secrets.SecretsStore) *Cloudbeds {
+func NewClient4CallbackAndInit(log *logrus.Logger, secretStore secrets.SecretsStore) (*Cloudbeds, error) {
 	log.Debugf("Creating new Cloudbeds client")
 	cloudbedsClient := &Cloudbeds{
 		log:         log,
@@ -392,7 +411,12 @@ func NewClient4Callback(log *logrus.Logger, secretStore secrets.SecretsStore) *C
 	cloudbedsClient.refresher = cloudbedsClient //refresher is an interface! This feint with ears is needed to point refreshToken method to itself. Now call p.refresher.refreshToken() will call refreshToken method of Cloudbeds struct
 	//refresher was created as interface to make the code more testable
 
-	return cloudbedsClient
+	err := cloudbedsClient.setOauth2Config()
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	return cloudbedsClient, nil
 }
 
 func (p *Cloudbeds) Close() error {
@@ -473,11 +497,12 @@ func (p *Cloudbeds) postHousekeepingStatus(roomID string, roomCondition string) 
 	return nil
 }
 
-func (r *Room) SearchRoomIDByPhoneNumber(phoneNumber string, mapFileName string) (string, error) {
+func (r *Room) SearchRoomIDByPhoneNumber(log *logrus.Logger, phoneNumber string, mapFileName string) (string, error) {
 	type RoomMap map[string]string
 	// Read file
 	jsonFile, err := os.Open(mapFileName)
 	if err != nil {
+		log.Error(err)
 		return "", err
 	}
 	defer jsonFile.Close()
@@ -490,42 +515,73 @@ func (r *Room) SearchRoomIDByPhoneNumber(phoneNumber string, mapFileName string)
 	// Unmarshal the JSON data into the map
 	err = json.Unmarshal(byteValue, &roomMap)
 	if err != nil {
+		log.Error(err)
 		return "", err
 	}
 
 	// Look up room ID by phone number
+	log.Tracef("Looking up room ID by phone number %s", phoneNumber)
 	roomID, ok := roomMap[phoneNumber]
 	if !ok {
-		return "", fmt.Errorf("phone number not found")
+		errMsg := fmt.Sprintf("phone number %s not found", phoneNumber)
+		log.Error(errMsg)
+		return "", errors.New(errMsg)
 	}
 
 	return roomID, nil
 }
 
 // setOauth2Config sets oauth2 config from env variables
-func (p *Cloudbeds) setOauth2Config() {
+func (p *Cloudbeds) setOauth2Config() error {
 	p.log.Debugf("Setting oauth2 config")
-	scopes := strings.Split(os.Getenv("CLOUDBEDS_SCOPES"), ",")
-	oauthConf = &oauth2.Config{
-		ClientID:     os.Getenv("CLOUDBEDS_CLIENT_ID"),
-		ClientSecret: os.Getenv("CLOUDBEDS_CLIENT_SECRET"),
-		RedirectURL:  os.Getenv("CLOUDBEDS_REDIRECT_URL"),
+
+	//first - trying to get vars from secretStore. If no luck - try from env
+	//if no luck again - return error
+
+	scopes := strings.Split(p.getVarFromStoreOrEnvironment("CLOUDBEDS_SCOPES"), ",")
+
+	oauthConfig := &oauth2.Config{
+		ClientID:     p.getVarFromStoreOrEnvironment("CLOUDBEDS_CLIENT_ID"),
+		ClientSecret: p.getVarFromStoreOrEnvironment("CLOUDBEDS_CLIENT_SECRET"),
+		RedirectURL:  p.getVarFromStoreOrEnvironment("CLOUDBEDS_REDIRECT_URL"),
 		Scopes:       scopes,
 		Endpoint: oauth2.Endpoint{
-			AuthURL:  os.Getenv("CLOUDBEDS_AUTH_URL"),
-			TokenURL: os.Getenv("CLOUDBEDS_TOKEN_URL"),
+			AuthURL:  p.getVarFromStoreOrEnvironment("CLOUDBEDS_AUTH_URL"),
+			TokenURL: p.getVarFromStoreOrEnvironment("CLOUDBEDS_TOKEN_URL"),
 		},
 	}
 	//check that all env variables are set
-	if oauthConf.ClientID == "" || oauthConf.ClientSecret == "" || oauthConf.RedirectURL == "" || oauthConf.Scopes == nil || oauthConf.Endpoint.AuthURL == "" || oauthConf.Endpoint.TokenURL == "" {
-		p.log.Fatal("Not all required env variables are set. Missed one of: CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET, CLOUDBEDS_REDIRECT_URL, CLOUDBEDS_SCOPES, CLOUDBEDS_AUTH_URL, CLOUDBEDS_TOKEN_URL")
+	if oauthConfig.ClientID == "" || oauthConfig.ClientSecret == "" || oauthConfig.RedirectURL == "" || oauthConfig.Scopes == nil || oauthConfig.Endpoint.AuthURL == "" || oauthConfig.Endpoint.TokenURL == "" {
+		errMsg := fmt.Errorf("Not all required env variables are set. Missed one of: CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET, CLOUDBEDS_REDIRECT_URL, CLOUDBEDS_SCOPES, CLOUDBEDS_AUTH_URL, CLOUDBEDS_TOKEN_URL")
+		p.log.Error(errMsg.Error())
+		return errMsg
 	}
+
+	p.oauthConf = oauthConfig
+	return nil
+}
+
+// getVarFromStoreOrEnvironment returns variable from secret store or environment if store is empty
+func (p *Cloudbeds) getVarFromStoreOrEnvironment(varName string) (result string) {
+	p.log.Tracef("Getting variable '%s' from store or environment", varName)
+	result, err := p.storeClient.RetrieveVar(varName)
+	if err != nil || result == "" {
+		result = os.Getenv(varName)
+		p.log.Debugf("The store is empty. Got variable '%s' from environment. Result: '%s'", varName, result)
+		if err != nil {
+			p.log.Errorf("Got error while trying to get variable '%s' from environment: %s", varName, err)
+		}
+		return
+	}
+	p.log.Debugf("Got variable '%s' from store. Result: '%s'", varName, result)
+	return
 }
 
 func (p *Cloudbeds) generateRandomString(length int) string {
 	bytes := make([]byte, length)
 	p.log.Debugf("Generating random string of length %d", length)
 	// Seed the random number generator with the current time
+	//
 	rand.Seed(time.Now().UnixNano())
 
 	if _, err := rand.Read(bytes); err != nil {

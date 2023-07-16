@@ -78,10 +78,10 @@ type Room struct {
 
 type HospitalityProvider interface {
 	GetRooms() ([]Room, error)
-	GetRoom(roomNumber string) (Room, error)
-	UpdateRoom(roomNumber, housekeepingStatus, housekeeperID string) (msg string, err error)
+	GetRoom(roomNumber string, mapFileName string) (Room, error)
+	UpdateRoom(roomNumber, housekeepingStatus, housekeeperID string, mapFileName string) (msg string, err error)
 	HandleOAuthCallback(state, code string) (err error)
-	HandleManualLogin() (url string, err error)
+	HandleInitialLogin() (url string, err error)
 }
 
 type DetailedError struct {

@@ -1,0 +1,52 @@
+{
+  "resource": "/api/v1/3cx/outbound_call",
+  "path": "/api/v1/3cx/outbound_call",
+  "httpMethod": "POST",
+  "headers": {
+    "CloudFront-Forwarded-Proto": "https",
+    "CloudFront-Is-Desktop-Viewer": "true",
+    "CloudFront-Is-Mobile-Viewer": "false",
+    "CloudFront-Is-SmartTV-Viewer": "false",
+    "CloudFront-Is-Tablet-Viewer": "false",
+    "CloudFront-Viewer-ASN": "14618",
+    "CloudFront-Viewer-Country": "US",
+    "Content-Type": "application/json; charset=utf-8",
+    "Host": "mock-api.example.com",
+    "User-Agent": "Mock User Agent",
+    "Via": "Mock Via",
+    "X-Amz-Cf-Id": "Mock-Amz-Cf-Id",
+    "X-Amzn-Trace-Id": "Mock-Amzn-Trace-Id",
+    "X-Forwarded-For": "10.0.0.1",
+    "X-Forwarded-Port": "443",
+    "X-Forwarded-Proto": "https"
+  },
+  "multiValueHeaders": {},
+  "queryStringParameters": {},
+  "multiValueQueryStringParameters": {},
+  "pathParameters": {},
+  "stageVariables": {},
+  "requestContext": {
+    "accountId": "mock-account-id",
+    "apiId": "mock-api-id",
+    "stage": "mock-stage",
+    "domainName": "mock-api.example.com",
+    "requestId": "mock-request-id",
+    "httpMethod": "POST",
+    "identity": {
+      "sourceIp": "10.0.0.1",
+      "userAgent": "Mock User Agent"
+    },
+    "resourcePath": "/api/v1/3cx/outbound_call",
+    "authorizer": {},
+    "apiGateway": {
+      "stage": "/mock-stage",
+      "requestTime": "2023-07-13T19:39:57.045Z",
+      "requestTimeEpoch": 1689277197045,
+      "path": "/api/v1/3cx/outbound_call",
+      "protocol": "HTTP/1.1",
+      "requestId": "mock-request-id"
+    }
+  },
+  "body": "{\"Number\":\"1234567890\",\"CallType\":\"Inbound\",\"CallDirection\":\"Inbound\",\"Name\":\"Mock Name\",\"Agent\":\"101\",\"AgentFirstName\":\"\",\"DateTime\":\"2023-07-13T15:39:00Z\"}",
+  "isBase64Encoded": false
+}
