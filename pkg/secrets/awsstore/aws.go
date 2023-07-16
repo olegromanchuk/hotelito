@@ -194,6 +194,7 @@ func Initialize(log *logrus.Logger, storePrefix string, awsRegion string) (*AWSS
 	}, nil
 }
 
+// Close closes the AWS session
 func (s *AWSSecretsStore) Close() error {
 	s.AWSSession = nil
 	return nil

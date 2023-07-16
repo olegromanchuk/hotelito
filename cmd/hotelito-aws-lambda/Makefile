@@ -48,6 +48,6 @@ run-3cxcall: build-3cxcall invoke-3cxcall
 
 install:
 	#create roomid_map.json in S3 bucket
-deploy-demo: build-all
+deploy: build-all
 	#go test -v ./...
 	./deploy_aws.sh
