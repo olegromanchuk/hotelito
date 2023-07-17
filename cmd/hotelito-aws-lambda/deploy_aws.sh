@@ -6,14 +6,24 @@ ORIGINAL_FILE_3CX=../../3cx/src/crm-template-cloudbeds-3cx-template.xml
 FINAL_FILE_3CX=../../3cx/crm-template-cloudbeds-3cx.xml
 FILE_ROOMID_EXTENSION_MAP=../../roomid_map.json
 
-# if samconfig.toml doesn't exist - run sam deploy --guided
+# if samconfig.toml doesn't exist - advise to run sam deploy --guided first
 if [ ! -f samconfig.toml ]; then
-  echo "samconfig.toml doesn't exist. Running \"sam deploy --guided\" first"
-  sam deploy --guided
+  echo "samconfig.toml doesn't exist. Run \"sam deploy --guided --no-execute-changeset\" first"
+  exit 1
 fi
 
 # get the AWS profile from the samconfig.toml file
 AWS_CONFIG_PROFILE=$(grep 'profile' samconfig.toml | awk -F '"' '{print $2}' | cut -d'"' -f 1)
+# if AWS_CONFIG_PROFILE is empty will set it to default with confirmation
+if [[ "${AWS_CONFIG_PROFILE}"z == z ]]; then
+  echo "AWS_CONFIG_PROFILE is not set. Using default profile"
+  read -p "Type \"y\" to continue": REPLY
+  if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+    AWS_CONFIG_PROFILE=default
+  else
+    exit 1
+  fi
+fi
 
 # Initialize the path prefix with a default value
 path_prefix="/hotelito-app"
@@ -69,7 +79,8 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 
     # create or update the parameter in the Parameter Store
     echo "Setting ${path_prefix}/${path_prefix_env}/${name}"
-    aws --profile ${AWS_CONFIG_PROFILE} ssm put-parameter \
+    aws ssm put-parameter \
+      --profile ${AWS_CONFIG_PROFILE} \
       --name "${path_prefix}/${path_prefix_env}/${name}" \
       --type "SecureString" \
       --value "\"${value}\"" \
@@ -78,11 +89,10 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 done <${ENV_FILE}
 
 # 2. Prepare for deployment
-AWS_CONFIG_PROFILE=$(grep 'profile' samconfig.toml | awk -F '"' '{print $2}' | cut -d'"' -f 1)
 STACKNAME=$(grep 'stack_name' samconfig.toml | awk -F '"' '{print $2}' | cut -d'"' -f 1)
 
-if [[ -z "$AWS_CONFIG_PROFILE" ]]; then
-  echo "AWS_CONFIG_PROFILE is not set. Run \"sam deploy --guided\" first"
+if [[ -z "${AWS_SAM_CONFIG_PROFILE}" ]]; then
+  echo "AWS_SAM_CONFIG_PROFILE is not set. Run \"sam deploy --guided\" first"
   exit 1
 fi
 
@@ -91,51 +101,76 @@ if [[ -z "$STACKNAME" ]]; then
   exit 1
 fi
 
-echo "Using AWS_CONFIG_PROFILE: ${AWS_CONFIG_PROFILE}"
+echo "Using AWS_SAM_CONFIG_PROFILE: ${AWS_CONFIG_PROFILE}"
 echo "Using STACKNAME: ${STACKNAME}"
 echo "Using APPLICATION_NAME: ${APPLICATION_NAME}"
 echo "Using ENVIRONMENT: ${ENVIRONMENT}"
 
 # 2. Deploy via SAM
 # TODO - get real Environment and ApplicationName fromn ./env and pass it to "sam deploy"
-sam deploy --profile ${AWS_CONFIG_PROFILE} --no-confirm-changeset --parameter-overrides "ParameterKey=LogLevel,ParameterValue=${LOG_LEVEL} ParameterKey=S3BucketMap3CXRoomExtClBedsRoomId,ParameterValue=${AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID} ParameterKey=ApplicationName,ParameterValue=${APPLICATION_NAME} ParameterKey=Environment,ParameterValue=${ENVIRONMENT}"
-#sam deploy --profile ${AWS_CONFIG_PROFILE} --parameter-overrides "ParameterKey=LogLevel,ParameterValue=${LOG_LEVEL}"
+sam deploy \
+  --profile ${AWS_CONFIG_PROFILE} \
+  --stack-name ${STACKNAME} \
+  --config-file samconfig.toml \
+  --resolve-s3 \
+  --capabilities CAPABILITY_IAM \
+#  --no-confirm-changeset \
+  --parameter-overrides "ParameterKey=LogLevel,ParameterValue=${LOG_LEVEL} ParameterKey=S3BucketMap3CXRoomExtClBedsRoomId,ParameterValue=${AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID} ParameterKey=ApplicationName,ParameterValue=${APPLICATION_NAME} ParameterKey=Environment,ParameterValue=${ENVIRONMENT}"
 
+sleep 10 # just in case - wait for the stack to be created
 
 # 3. Update the API Gateway throttling settings
 read -p "set throttling? yes/no: " DEVEL
 if [[ ${DEVEL} == "yes" ]]; then
-  APIID=$(aws --profile=${AWS_CONFIG_PROFILE} apigateway get-rest-apis | jq -r ".items[] | select (.name == \"${STACKNAME}\") | .id")
+  APIID=$(aws apigateway get-rest-apis --profile=${AWS_CONFIG_PROFILE} | jq -r ".items[] | select (.name == \"${STACKNAME}\") | .id")
   echo "APIID: ${APIID}, AWS_CONFIG_PROFILE: ${AWS_CONFIG_PROFILE}, STACKNAME: ${STACKNAME}"
-  aws --profile=${AWS_CONFIG_PROFILE} apigateway update-stage --rest-api-id="${APIID}" --stage-name="Prod" --patch-operations op=replace,path='/*/*/throttling/rateLimit',value=4
-  aws --profile=${AWS_CONFIG_PROFILE} apigateway update-stage --rest-api-id="${APIID}" --stage-name="Prod" --patch-operations op=replace,path='/*/*/throttling/burstLimit',value=2
+  aws apigateway update-stage \
+    --profile=${AWS_CONFIG_PROFILE} \
+    --rest-api-id="${APIID}" \
+    --stage-name="Prod" \
+    --patch-operations op=replace,path='/*/*/throttling/rateLimit',value=4
+  aws apigateway update-stage \
+    --profile=${AWS_CONFIG_PROFILE} \
+    --rest-api-id="${APIID}" \
+    --stage-name="Prod" \
+    --patch-operations op=replace,path='/*/*/throttling/burstLimit',value=2
 
   #delete stage Stage if any
 
   # Get the stages
-  STAGES=$(aws --profile=${AWS_CONFIG_PROFILE apigateway get-stages --rest-api-id="${APIID}"} --query 'item[*].stageName' --output text)
+  STAGES=$(aws apigateway get-stages \
+    --profile=${AWS_CONFIG_PROFILE} \
+    --rest-api-id="${APIID}" \
+    --query 'item[*].stageName' \
+    --output text)
 
   # Check if the stage exists in the list
   if echo "$STAGES" | grep -q "Stage"; then
       echo "Stage exists. Deleting..."
-      aws --profile=${AWS_CONFIG_PROFILE} apigateway delete-stage --rest-api-id="${APIID}" --stage-name="Stage"
+      aws apigateway delete-stage \
+        --profile=${AWS_CONFIG_PROFILE} \
+        --rest-api-id="${APIID}" \
+        --stage-name="Stage"
   else
       echo "Stage does not exist."
   fi
 fi
 
 # 4. Get API gateway URL
-FUNC_NAME=$(aws --profile ${AWS_CONFIG_PROFILE} apigateway get-rest-apis --query "items[?name=='${STACKNAME}'].id" --output text)
+FUNC_NAME=$(aws apigateway get-rest-apis --profile ${AWS_CONFIG_PROFILE} --query "items[?name=='${STACKNAME}'].id" --output text)
 # get the AWS region from the samconfig.toml file
 AWS_REGION=$(grep '^region' samconfig.toml | awk -F '"' '{print $2}' | cut -d'"' -f 1)
 # compiling the URL. The URL will be used by cloudbeds to redirect the user after login back to our API
+echo "AWS_REGION: ${AWS_REGION}"
+echo "FUNC_NAME: ${FUNC_NAME}"
 CLOUDBEDS_REDIRECT_URL="https://${FUNC_NAME}.execute-api.${AWS_REGION}.amazonaws.com/Prod/api/v1/callback"
 # set ssm parameter
 name="CLOUDBEDS_REDIRECT_URL"
 value="${CLOUDBEDS_REDIRECT_URL}"
-# create or update the parameter in the Parameter Store
+# update CLOUDBEDS_REDIRECT_URL in the Parameter Store
 echo "Setting ${path_prefix}/${path_prefix_env}/${name} in parameter store"
-aws --profile ${AWS_CONFIG_PROFILE} ssm put-parameter \
+aws ssm put-parameter \
+  --profile ${AWS_CONFIG_PROFILE}\
   --name "${path_prefix}/${path_prefix_env}/${name}" \
   --type "SecureString" \
   --value "\"${value}\"" \
@@ -154,7 +189,7 @@ sed -i "" -e "s|TEMPLATE_API_URL|${API_BASE_URL}|" ${FINAL_FILE_3CX}
 # Set the bucket name variable
 echo "Uploading ${FILE_ROOMID_EXTENSION_MAP} to s3://${AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID}"
 # Upload the file to S3 bucket
-aws --profile ${AWS_CONFIG_PROFILE} s3 cp "${FILE_ROOMID_EXTENSION_MAP}" "s3://${AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID}/"
+aws s3 cp --profile ${AWS_CONFIG_PROFILE} "${FILE_ROOMID_EXTENSION_MAP}" "s3://${AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID}/"
 
 
 # 6. Output results
