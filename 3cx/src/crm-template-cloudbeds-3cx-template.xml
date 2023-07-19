@@ -87,11 +87,7 @@
       </Outputs>
     </Scenario>
     <Scenario Id="ReportCall" Type="REST">
-<<<<<<< HEAD:3cx/src/crm-template-cloudbeds-3cx-template.xml
       <Request SkipIf="[IIf([ReportCallEnabled]!=True||[EntityId]==&quot;&quot;,True,[IIf([CallType]!=Inbound,True,False)])]" Url="TEMPLATE_API_URL/api/v1/3cx/outbound_call" MessagePasses="0" RequestContentType="application/json" RequestEncoding="Json" RequestType="Post" ResponseType="Json">
-=======
-      <Request SkipIf="[IIf([ReportCallEnabled]!=True||[EntityId]==&quot;&quot;,True,[IIf([CallType]!=Inbound,True,False)])]" Url="https://076a-74-117-148-31.ngrok-free.app/api/v1/3cx/outbound_call" MessagePasses="0" RequestContentType="application/json" RequestEncoding="Json" RequestType="Post" ResponseType="Json">
->>>>>>> master:crm-template-cloudbeds-3cx.xml
         <PostValues Key="">
           <Value Key="Number" Passes="1" Type="String">[Number]</Value>
           <Value Key="CallType" Passes="1" Type="String">[CallType]</Value>
@@ -100,15 +96,6 @@
           <Value Key="Agent" Passes="1" Type="String">[Agent]</Value>
           <Value Key="AgentFirstName" Passes="1" Type="String">[AgentFirstName]</Value>
           <Value Key="DateTime" Passes="1" Type="String">[DateTime]</Value>
-        </PostValues>
-      </Request>
-      <Variables />
-      <Outputs Next="ReportCallMissed" AllowEmpty="true" />
-    </Scenario>
-    <Scenario Id="ReportCallMissed" Type="REST">
-      <Request SkipIf="[IIf([ReportCallEnabled]!=True||[EntityId]==&quot;&quot;,True,[IIf([CallType]!=Missed,True,False)])]" Url="https://notinuse.app/api/v1/3cx/null" MessagePasses="0" RequestContentType="application/json" RequestEncoding="Json" RequestType="Post" ResponseType="Json">
-        <PostValues Key="">
-          <Value Key="phone" Passes="1" Type="String">[Number]</Value>
         </PostValues>
       </Request>
       <Variables />
