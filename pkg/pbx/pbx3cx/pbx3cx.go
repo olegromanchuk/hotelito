@@ -57,10 +57,12 @@ func (pbx3cx *PBX3CX) processOutboundCall(requestBody RequestBody) (room pbx.Roo
 	houskeeperID := "1" //TODO: get houskeeperID from cloudbeds
 
 	switch requestBody.Number {
-	case "2222222501":
+	case "2222222222":
 		roomCondition = "clean"
-	case "2222222502":
+	case "2222222221":
 		roomCondition = "dirty"
+	default:
+		roomCondition = "undefined"
 	}
 
 	room = pbx.Room{

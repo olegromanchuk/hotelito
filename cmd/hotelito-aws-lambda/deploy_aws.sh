@@ -91,17 +91,12 @@ done <${ENV_FILE}
 # 2. Prepare for deployment
 STACKNAME=$(grep 'stack_name' samconfig.toml | awk -F '"' '{print $2}' | cut -d'"' -f 1)
 
-if [[ -z "${AWS_SAM_CONFIG_PROFILE}" ]]; then
-  echo "AWS_SAM_CONFIG_PROFILE is not set. Run \"sam deploy --guided\" first"
-  exit 1
-fi
-
 if [[ -z "$STACKNAME" ]]; then
   echo "STACKNAME is not set. Run \"sam deploy --guided\" first"
   exit 1
 fi
 
-echo "Using AWS_SAM_CONFIG_PROFILE: ${AWS_CONFIG_PROFILE}"
+echo "Using AWS_CONFIG_PROFILE: ${AWS_CONFIG_PROFILE}"
 echo "Using STACKNAME: ${STACKNAME}"
 echo "Using APPLICATION_NAME: ${APPLICATION_NAME}"
 echo "Using ENVIRONMENT: ${ENVIRONMENT}"
@@ -114,13 +109,13 @@ sam deploy \
   --config-file samconfig.toml \
   --resolve-s3 \
   --capabilities CAPABILITY_IAM \
-#  --no-confirm-changeset \
+  --confirm-changeset \
   --parameter-overrides "ParameterKey=LogLevel,ParameterValue=${LOG_LEVEL} ParameterKey=S3BucketMap3CXRoomExtClBedsRoomId,ParameterValue=${AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID} ParameterKey=ApplicationName,ParameterValue=${APPLICATION_NAME} ParameterKey=Environment,ParameterValue=${ENVIRONMENT}"
 
 sleep 10 # just in case - wait for the stack to be created
 
 # 3. Update the API Gateway throttling settings
-read -p "set throttling? yes/no: " DEVEL
+read -p "Set throttling on API gateway. Rate:4, burst:2? yes/no: " DEVEL
 if [[ ${DEVEL} == "yes" ]]; then
   APIID=$(aws apigateway get-rest-apis --profile=${AWS_CONFIG_PROFILE} | jq -r ".items[] | select (.name == \"${STACKNAME}\") | .id")
   echo "APIID: ${APIID}, AWS_CONFIG_PROFILE: ${AWS_CONFIG_PROFILE}, STACKNAME: ${STACKNAME}"
@@ -134,26 +129,25 @@ if [[ ${DEVEL} == "yes" ]]; then
     --rest-api-id="${APIID}" \
     --stage-name="Prod" \
     --patch-operations op=replace,path='/*/*/throttling/burstLimit',value=2
+fi
 
-  #delete stage Stage if any
+# Delete stage "Stage" from API Gateway if any
+# Get the stages
+STAGES=$(aws apigateway get-stages \
+  --profile=${AWS_CONFIG_PROFILE} \
+  --rest-api-id="${APIID}" \
+  --query 'item[*].stageName' \
+  --output text)
 
-  # Get the stages
-  STAGES=$(aws apigateway get-stages \
+# Check if the stage exists in the list
+if echo "$STAGES" | grep -q "Stage"; then
+  echo "Stages exists. Deleting..."
+  aws apigateway delete-stage \
     --profile=${AWS_CONFIG_PROFILE} \
     --rest-api-id="${APIID}" \
-    --query 'item[*].stageName' \
-    --output text)
-
-  # Check if the stage exists in the list
-  if echo "$STAGES" | grep -q "Stage"; then
-      echo "Stage exists. Deleting..."
-      aws apigateway delete-stage \
-        --profile=${AWS_CONFIG_PROFILE} \
-        --rest-api-id="${APIID}" \
-        --stage-name="Stage"
-  else
-      echo "Stage does not exist."
-  fi
+    --stage-name="Stage"
+else
+  echo "Stage does not exist."
 fi
 
 # 4. Get API gateway URL
@@ -170,7 +164,7 @@ value="${CLOUDBEDS_REDIRECT_URL}"
 # update CLOUDBEDS_REDIRECT_URL in the Parameter Store
 echo "Setting ${path_prefix}/${path_prefix_env}/${name} in parameter store"
 aws ssm put-parameter \
-  --profile ${AWS_CONFIG_PROFILE}\
+  --profile ${AWS_CONFIG_PROFILE} \
   --name "${path_prefix}/${path_prefix_env}/${name}" \
   --type "SecureString" \
   --value "\"${value}\"" \
@@ -184,18 +178,18 @@ API_BASE_URL="https://${FUNC_NAME}.execute-api.${AWS_REGION}.amazonaws.com/Prod"
 # replace the TEMPLATE_API_URL on API_BASE_URL
 sed -i "" -e "s|TEMPLATE_API_URL|${API_BASE_URL}|" ${FINAL_FILE_3CX}
 
-
 # 6. Upload roomid_map.json to S3
 # Set the bucket name variable
 echo "Uploading ${FILE_ROOMID_EXTENSION_MAP} to s3://${AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID}"
 # Upload the file to S3 bucket
 aws s3 cp --profile ${AWS_CONFIG_PROFILE} "${FILE_ROOMID_EXTENSION_MAP}" "s3://${AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID}/"
 
-
 # 6. Output results
-echo "--------------"
-echo "Set \"REDIRECT URL\" in cloudbeds to this value: ${CLOUDBEDS_REDIRECT_URL}"
 echo
+echo
+echo "------------------------------- OUTPUTS ----------------------------------"
+echo
+echo "Set \"REDIRECT URL\" in cloudbeds to this value: ${CLOUDBEDS_REDIRECT_URL}"
 echo "For initial authentication run: https://${FUNC_NAME}.execute-api.${AWS_REGION}.amazonaws.com/Prod/api/v1"
 echo "3CX template could be found here: ${FINAL_FILE_3CX} Import it in 3CX as a new template."
 echo

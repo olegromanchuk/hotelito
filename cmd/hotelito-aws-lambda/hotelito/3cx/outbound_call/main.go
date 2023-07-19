@@ -138,6 +138,7 @@ func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayPro
 	room, err := h.PBX.ProcessPBXRequest(decoder)
 	if err != nil {
 		if err.Error() == "incoming-call-ignoring" { //ignore incoming calls. Specific of 3CX. 3CX sends 2 request for each call: incoming(through loopback) and outgoing
+			h.Log.Debugf("Ignoring incoming call")
 			return events.APIGatewayProxyResponse{StatusCode: http.StatusOK}, nil
 		}
 		h.Log.Error(err)
