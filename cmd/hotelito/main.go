@@ -57,19 +57,19 @@ func main() {
 	api := r.PathPrefix("/api/v1").Subrouter()
 	api.Use(loggingMiddleware)
 
+	//parse config.json
+	mapFileName := os.Getenv("HOSPITALITY_PHONE2ROOM_MAP_FILENAME")
+	configMap, err := configuration.New(log, mapFileName)
+	if err != nil {
+		log.Fatal(err) //TODO: add error handling. Try to load previous version of configMap
+	}
+
 	//   ---------------------- Cloudbed parts ----------------------
 
 	//current secret store - boltDB
 	storeClient, err := boltstore.Initialize()
 	if err != nil {
 		log.Fatal(err)
-	}
-
-	//get mapFileName from config.json
-	mapFileName := os.Getenv("CLOUDBEDS_PHONE2ROOM_MAP_FILENAME")
-	configMap, err := configuration.New(log, mapFileName)
-	if err != nil {
-		log.Fatal(err) //TODO: add error handling. Try to load previous version of configMap
 	}
 
 	//create cloudbeds client

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/olegromanchuk/hotelito/internal/configuration"
 	"github.com/olegromanchuk/hotelito/internal/handlers"
 	"github.com/olegromanchuk/hotelito/internal/logging"
 	"github.com/olegromanchuk/hotelito/pkg/hotel/cloudbeds"
@@ -69,8 +70,9 @@ func HandleLookupByNumber(ctx context.Context, request events.APIGatewayProxyReq
 		log.Fatal(err)
 	}
 
+	configMap := &configuration.ConfigMap{} //we do not use configuration in this lambda. Empty struct is ok
 	//create cloudbeds client
-	clbClient, err := cloudbeds.New(log, storeClient)
+	clbClient, err := cloudbeds.New(log, storeClient, configMap)
 	if err != nil {
 		log.Errorf("Error creating cloudbeds client: %v", err)
 		return events.APIGatewayProxyResponse{
@@ -85,7 +87,7 @@ func HandleLookupByNumber(ctx context.Context, request events.APIGatewayProxyReq
 
 	//option via handler interface. Helpful for testing
 	//create 3cx client
-	pbx3cxClient := pbx3cx.New(log)
+	pbx3cxClient := pbx3cx.New(log, configMap)
 	//define handlers
 	h := handlers.NewHandler(log, pbx3cxClient, clbClient)
 	jsonAsBytes, err := h.PBX.ProcessLookupByNumber(number)

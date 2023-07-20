@@ -34,7 +34,7 @@ func New(log *logrus.Logger, mapFileName string) (*ConfigMap, error) {
 	//process configuration file
 	file, err := os.Open(mapFileName)
 	if err != nil {
-		errMsg := fmt.Errorf("Error opening config file: ", err.Error())
+		errMsg := fmt.Errorf("Error opening config file: %s", err.Error())
 		log.Errorf(errMsg.Error())
 		return configMapInfo, errMsg
 	}

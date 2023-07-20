@@ -83,7 +83,8 @@ func HandleInit(ctx context.Context, request events.APIGatewayProxyRequest) (eve
 	log.Debugf("Handling init")
 
 	//create 3cx client
-	pbx3cxClient := pbx3cx.New(log)
+	//pbx3cxClient := pbx3cx.New(log, configMap)
+	pbx3cxClient := &pbx3cx.PBX3CX{} //we do not need full-blown 3cx client for initial authorization
 	//define handlers
 	h := handlers.NewHandler(log, pbx3cxClient, clbClient)
 	url, err := h.Hotel.HandleInitialLogin()
