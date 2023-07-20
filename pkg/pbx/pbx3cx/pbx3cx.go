@@ -3,6 +3,7 @@ package pbx3cx
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/olegromanchuk/hotelito/internal/configuration"
 	"github.com/olegromanchuk/hotelito/pkg/pbx"
 	"github.com/sirupsen/logrus"
 )
@@ -18,13 +19,16 @@ type RequestBody struct {
 }
 
 type PBX3CX struct {
-	log *logrus.Logger
+	log       *logrus.Logger
+	configMap *configuration.ConfigMap
 }
 
-func New(log *logrus.Logger) *PBX3CX {
+func New(log *logrus.Logger, configMapInfo *configuration.ConfigMap) *PBX3CX {
 	log.Debugf("Creating new PBX3CX client")
+
 	pbx3cx := &PBX3CX{
-		log: log,
+		log:       log,
+		configMap: configMapInfo,
 	}
 	return pbx3cx
 }
@@ -52,21 +56,25 @@ func (pbx3cx *PBX3CX) ProcessPBXRequest(jsonDecoder *json.Decoder) (room pbx.Roo
 }
 
 func (pbx3cx *PBX3CX) processOutboundCall(requestBody RequestBody) (room pbx.Room, err error) {
-	pbx3cx.log.Debugf("Processing outbound call to %s", requestBody.Number)
-	var roomCondition string
-	houskeeperID := "1" //TODO: get houskeeperID from cloudbeds
+	pbx3cx.log.Debugf("Processing outbound call from %s to %s", requestBody.Agent, requestBody.Number)
 
-	switch requestBody.Number {
-	case "2222222501":
-		roomCondition = "clean"
-	case "2222222502":
-		roomCondition = "dirty"
+	PhoneNumber4HouseKeeper := requestBody.Number //2222222221
+	RoomExtension := requestBody.Agent            //1001
+
+	//creating map of housekeeper numbers, so we can easily find housekeeper and room status by phone number
+	mapHousekeeperNumbers := make(map[string]configuration.Housekeeper)
+	for _, housekeeper := range pbx3cx.configMap.HousekeeperMap {
+		mapHousekeeperNumbers[housekeeper.PhoneNumber] = housekeeper
 	}
 
+	numberInformation := mapHousekeeperNumbers[PhoneNumber4HouseKeeper]
+	pbx3cx.log.Debugf("found housekeeper number: %s. Housekeeper: %s. Room condition: %s", numberInformation.PhoneNumber, numberInformation.HousekeeperName, numberInformation.NumberType)
+	roomCondition := numberInformation.NumberType
+
 	room = pbx.Room{
-		PhoneNumber:   requestBody.Agent,
-		RoomCondition: roomCondition,
-		HouskeeperID:  houskeeperID,
+		PhoneNumber:     RoomExtension,
+		RoomCondition:   roomCondition,
+		HousekeeperName: mapHousekeeperNumbers[PhoneNumber4HouseKeeper].HousekeeperName,
 	}
 	return room, nil
 }

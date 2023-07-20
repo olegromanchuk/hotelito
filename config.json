@@ -1,0 +1,41 @@
+{
+  "extension_map": [
+    {
+      "room_extension": "1000",
+      "hospitality_room_id": "544559-0",
+      "hospitality_room_name": "DQ-1"
+    },
+    {
+      "room_extension": "1001",
+      "hospitality_room_id": "544559-1",
+      "hospitality_room_name": "DQ-2"
+    },
+    {
+      "room_extension": "1003",
+      "hospitality_room_id": "544559-2",
+      "hospitality_room_name": "DQ-3"
+    }
+  ],
+  "housekeeper_map": [
+    {
+      "phone_number": "2222222221",
+      "housekeeper_name": "Michael Jackson",
+      "number_type": "dirty"
+    },
+    {
+      "phone_number": "2222222222",
+      "housekeeper_name": "Michael Jackson",
+      "number_type": "clean"
+    },
+    {
+      "phone_number": "2222222232",
+      "housekeeper_name": "Madonna",
+      "number_type": "dirty"
+    },
+    {
+      "phone_number": "2222222233",
+      "housekeeper_name": "Madonna",
+      "number_type": "clean"
+    }
+  ]
+}

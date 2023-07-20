@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
+	"github.com/olegromanchuk/hotelito/internal/configuration"
 	"github.com/olegromanchuk/hotelito/internal/handlers"
 	"github.com/olegromanchuk/hotelito/internal/logging"
 	"github.com/olegromanchuk/hotelito/pkg/hotel/cloudbeds"
@@ -56,6 +57,13 @@ func main() {
 	api := r.PathPrefix("/api/v1").Subrouter()
 	api.Use(loggingMiddleware)
 
+	//parse config.json
+	mapFileName := os.Getenv("HOSPITALITY_PHONE2ROOM_MAP_FILENAME")
+	configMap, err := configuration.New(log, mapFileName)
+	if err != nil {
+		log.Fatal(err) //TODO: add error handling. Try to load previous version of configMap
+	}
+
 	//   ---------------------- Cloudbed parts ----------------------
 
 	//current secret store - boltDB
@@ -65,14 +73,14 @@ func main() {
 	}
 
 	//create cloudbeds client
-	clbClient, err := cloudbeds.New(log, storeClient)
+	clbClient, err := cloudbeds.New(log, storeClient, configMap)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer clbClient.Close()
 
 	//create 3cx client
-	pbx3cxClient := pbx3cx.New(log)
+	pbx3cxClient := pbx3cx.New(log, configMap)
 	defer clbClient.Close()
 
 	//define handlers

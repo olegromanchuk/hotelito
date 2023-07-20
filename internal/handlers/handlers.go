@@ -83,7 +83,7 @@ func (h *Handler) Handle3cxCallInfo(w http.ResponseWriter, r *http.Request) {
 
 	//get provider
 	hotelProvider := h.Hotel
-	msg, err := hotelProvider.UpdateRoom(room.PhoneNumber, room.RoomCondition, room.HouskeeperID, os.Getenv("CLOUDBEDS_PHONE2ROOM_MAP_FILENAME"))
+	msg, err := hotelProvider.UpdateRoom(room.PhoneNumber, room.RoomCondition, room.HousekeeperName, os.Getenv("HOSPITALITY_PHONE2ROOM_MAP_FILENAME"))
 	if err != nil {
 		h.Log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -135,7 +135,8 @@ func (h *Handler) HandleSetHousekeepingStatus(w http.ResponseWriter, r *http.Req
 
 	h.Log.Debugf("roomPhoneNumber: %s, housekeepingStatus: %s, housekeeperID: %s", roomPhoneNumber, housekeepingStatus, housekeeperID)
 	hotelProvider := h.Hotel
-	msg, err := hotelProvider.UpdateRoom(roomPhoneNumber, housekeepingStatus, housekeeperID, os.Getenv("CLOUDBEDS_PHONE2ROOM_MAP_FILENAME"))
+	//roomPhoneNumber = 1001
+	msg, err := hotelProvider.UpdateRoom(roomPhoneNumber, housekeepingStatus, housekeeperID, os.Getenv("HOSPITALITY_PHONE2ROOM_MAP_FILENAME"))
 	if err != nil {
 		h.Log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)

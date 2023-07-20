@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/olegromanchuk/hotelito/internal/configuration"
 	"github.com/olegromanchuk/hotelito/pkg/hotel"
 	"github.com/olegromanchuk/hotelito/pkg/secrets"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
-	"io"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -34,6 +34,12 @@ type Room struct {
 	RoomOccupied      bool   `json:"RoomOccupied,omitempty"`
 }
 
+type RoomFromConfig struct {
+	RoomExtension       string `json:"room_extension"`
+	HospitalityRoomID   string `json:"hospitality_room_id"`
+	HospitalityRoomName string `json:"hospitality_room_name"`
+}
+
 var (
 	loginLoopPreventionCounter = 1
 )
@@ -51,6 +57,7 @@ type Cloudbeds struct {
 	log         *logrus.Logger
 	refresher   TokenRefresher
 	oauthConf   *oauth2.Config
+	configMap   *configuration.ConfigMap
 }
 
 // TokenRefresher is needed for mocking http requests in tests. This is the only reason to create this interface. Cloudbeds implements this interface
@@ -172,13 +179,13 @@ func (p *Cloudbeds) CancelReservation(reservationID string) error {
 	return nil
 }
 
-func (p *Cloudbeds) UpdateRoom(roomNumber, housekeepingStatus, housekeeperID string, mapFileName string) (msg string, err error) {
-	p.log.Debugf("Start UpdateRoom %s to %s", roomNumber, housekeepingStatus)
+func (p *Cloudbeds) UpdateRoom(roomNumber, housekeepingStatus, housekeeperName string, mapFileName string) (msg string, err error) {
+	p.log.Debugf("Start UpdateRoom %s to %s for %s", roomNumber, housekeepingStatus, housekeeperName)
 
 	//get room id
 	room := &Room{}
 	room.PhoneNumber = roomNumber
-	roomID, err := room.SearchRoomIDByPhoneNumber(p.log, roomNumber, mapFileName)
+	roomID, err := room.SearchRoomIDByPhoneNumber(p.log, roomNumber, p.configMap.ExtensionMap)
 	if err != nil {
 		p.log.Error(err)
 		return msg, err
@@ -202,7 +209,7 @@ func (p *Cloudbeds) GetRoom(roomNumber string, mapFileName string) (hotel.Room, 
 	//get room id
 	room := &Room{}
 	room.PhoneNumber = roomNumber
-	roomID, err := room.SearchRoomIDByPhoneNumber(p.log, roomNumber, mapFileName)
+	roomID, err := room.SearchRoomIDByPhoneNumber(p.log, roomNumber, p.configMap.ExtensionMap)
 	if err != nil {
 		p.log.Error(err)
 		return room.ToHotelRoom(), err
@@ -367,12 +374,13 @@ func (p *Cloudbeds) HandleOAuthCallback(state, code string) (err error) {
 	return nil
 }
 
-func New(log *logrus.Logger, secretStore secrets.SecretsStore) (*Cloudbeds, error) {
+func New(log *logrus.Logger, secretStore secrets.SecretsStore, configMapInfo *configuration.ConfigMap) (*Cloudbeds, error) {
 	log.Debugf("Creating new Cloudbeds client")
 	cloudbedsClient := &Cloudbeds{
 		log:         log,
 		oauthConf:   &oauth2.Config{},
 		storeClient: secretStore,
+		configMap:   configMapInfo,
 	}
 	err := cloudbedsClient.setOauth2Config()
 	if err != nil {
@@ -497,38 +505,25 @@ func (p *Cloudbeds) postHousekeepingStatus(roomID string, roomCondition string) 
 	return nil
 }
 
-func (r *Room) SearchRoomIDByPhoneNumber(log *logrus.Logger, phoneNumber string, mapFileName string) (string, error) {
-	type RoomMap map[string]string
-	// Read file
-	jsonFile, err := os.Open(mapFileName)
-	if err != nil {
-		log.Error(err)
-		return "", err
-	}
-	defer jsonFile.Close()
+func (r *Room) SearchRoomIDByPhoneNumber(log *logrus.Logger, phoneNumber string, extensionsInfo []configuration.Extension) (string, error) {
 
-	byteValue, _ := io.ReadAll(jsonFile)
-
-	// Initialize a map to store the JSON data in
-	var roomMap RoomMap
-
-	// Unmarshal the JSON data into the map
-	err = json.Unmarshal(byteValue, &roomMap)
-	if err != nil {
-		log.Error(err)
-		return "", err
+	// create map for easy search
+	roomMap := make(map[string]configuration.Extension)
+	for _, extension := range extensionsInfo {
+		roomMap[extension.RoomExtension] = extension
 	}
 
 	// Look up room ID by phone number
 	log.Tracef("Looking up room ID by phone number %s", phoneNumber)
-	roomID, ok := roomMap[phoneNumber]
+	room, ok := roomMap[phoneNumber]
 	if !ok {
 		errMsg := fmt.Sprintf("phone number %s not found", phoneNumber)
 		log.Error(errMsg)
 		return "", errors.New(errMsg)
 	}
+	log.Tracef("Found room name: %s, ID: %s for phone number: %s", room.HospitalityRoomName, room.HospitalityRoomID, phoneNumber)
 
-	return roomID, nil
+	return room.HospitalityRoomID, nil
 }
 
 // setOauth2Config sets oauth2 config from env variables

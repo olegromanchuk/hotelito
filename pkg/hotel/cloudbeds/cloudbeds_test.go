@@ -3,6 +3,7 @@ package cloudbeds
 import (
 	"bytes"
 	"fmt"
+	"github.com/olegromanchuk/hotelito/internal/configuration"
 	"github.com/olegromanchuk/hotelito/pkg/hotel"
 	"github.com/olegromanchuk/hotelito/pkg/secrets"
 	"github.com/sirupsen/logrus"
@@ -263,15 +264,26 @@ func TestCloudbeds_GetRooms(t *testing.T) {
 func TestRoom_SearchRoomIDByPhoneNumber(t *testing.T) {
 
 	log := logrus.New()
-	// Setup: create roomid_map.json file
-	roomMapData := `{
-		"100": "544559-0",
-		"101": "544559-1"
-    }`
 
-	err := os.WriteFile("roomid_map_test.json", []byte(roomMapData), 0644)
-	if err != nil {
-		t.Fatalf("unable to set up test: %v", err)
+	//get extensionsInfo from configuration.Extension
+	/*
+		type Extension struct {
+			RoomExtension       string `json:"room_extension"`
+			HospitalityRoomID   string `json:"hospitality_room_id"`
+			HospitalityRoomName string `json:"hospitality_room_name"`
+		}
+	*/
+	extensionsInfo := []configuration.Extension{
+		{
+			RoomExtension:       "100",
+			HospitalityRoomID:   "544559-0",
+			HospitalityRoomName: "DQ(1)",
+		},
+		{
+			RoomExtension:       "101",
+			HospitalityRoomID:   "544559-1",
+			HospitalityRoomName: "DQ(2)",
+		},
 	}
 
 	type fields struct {
@@ -360,18 +372,12 @@ func TestRoom_SearchRoomIDByPhoneNumber(t *testing.T) {
 				RoomCondition:     tt.fields.RoomCondition,
 				RoomOccupied:      tt.fields.RoomOccupied,
 			}
-			got, err := r.SearchRoomIDByPhoneNumber(log, tt.args.phoneNumber, "roomid_map_test.json")
+			got, err := r.SearchRoomIDByPhoneNumber(log, tt.args.phoneNumber, extensionsInfo)
 			if !tt.wantErr(t, err, fmt.Sprintf("SearchRoomIDByPhoneNumber(%v)", tt.args.phoneNumber)) {
 				return
 			}
 			assert.Equalf(t, tt.want, got, "SearchRoomIDByPhoneNumber(%v)", tt.args.phoneNumber)
 		})
-	}
-
-	// Teardown: delete roomid_map.json file
-	err = os.Remove("roomid_map_test.json")
-	if err != nil {
-		t.Errorf("unable to tear down test: %v", err)
 	}
 }
 

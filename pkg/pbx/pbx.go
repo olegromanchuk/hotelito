@@ -8,7 +8,7 @@ type PBXProvider interface {
 }
 
 type Room struct {
-	PhoneNumber   string `json:"PhoneNumber"`
-	RoomCondition string `json:"RoomCondition"`
-	HouskeeperID  string `json:"HouskeeperID"`
+	PhoneNumber     string `json:"PhoneNumber"`
+	RoomCondition   string `json:"RoomCondition"`
+	HousekeeperName string `json:"HousekeeperName"`
 }
