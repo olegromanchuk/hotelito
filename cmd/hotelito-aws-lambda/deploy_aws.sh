@@ -96,7 +96,7 @@ if [[ -z "$STACKNAME" ]]; then
   exit 1
 fi
 
-echo "Using AWS_CONFIG_PROFILE: ${AWS_CONFIG_PROFILE}"
+echo "Using AWS_SAM_CONFIG_PROFILE: ${AWS_CONFIG_PROFILE}"
 echo "Using STACKNAME: ${STACKNAME}"
 echo "Using APPLICATION_NAME: ${APPLICATION_NAME}"
 echo "Using ENVIRONMENT: ${ENVIRONMENT}"
@@ -129,6 +129,7 @@ if [[ ${DEVEL} == "yes" ]]; then
     --rest-api-id="${APIID}" \
     --stage-name="Prod" \
     --patch-operations op=replace,path='/*/*/throttling/burstLimit',value=2
+
 fi
 
 # Delete stage "Stage" from API Gateway if any
@@ -164,6 +165,7 @@ value="${CLOUDBEDS_REDIRECT_URL}"
 # update CLOUDBEDS_REDIRECT_URL in the Parameter Store
 echo "Setting ${path_prefix}/${path_prefix_env}/${name} in parameter store"
 aws ssm put-parameter \
+
   --profile ${AWS_CONFIG_PROFILE} \
   --name "${path_prefix}/${path_prefix_env}/${name}" \
   --type "SecureString" \
