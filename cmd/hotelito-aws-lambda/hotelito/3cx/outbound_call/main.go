@@ -15,7 +15,6 @@ import (
 	"github.com/olegromanchuk/hotelito/internal/logging"
 	"github.com/olegromanchuk/hotelito/pkg/hotel/cloudbeds"
 	"github.com/olegromanchuk/hotelito/pkg/pbx/pbx3cx"
-	"github.com/olegromanchuk/hotelito/pkg/secrets"
 	"github.com/olegromanchuk/hotelito/pkg/secrets/awsstore"
 	"github.com/sirupsen/logrus"
 	"net/http"
@@ -219,22 +218,6 @@ func fetchS3ObjectAndSaveToFile(log *logrus.Logger, bucket, fileName string) (fi
 	fullFileName := fmt.Sprintf("/tmp/%s", fileName)
 	log.Tracef("Stored to %s from bucket %s, %d bytes", fullFileName, bucket, bytesDownloaded)
 	return fullFileName, nil
-}
-
-// getVarFromStoreOrEnvironment returns variable from secret store or environment if store is empty
-func getVarFromStoreOrEnvironment(log *logrus.Logger, varName string, storeClient secrets.SecretsStore) (result string) {
-	log.Tracef("Getting variable '%s' from store or environment", varName)
-	result, err := storeClient.RetrieveVar(varName)
-	if err != nil || result == "" {
-		result = os.Getenv(varName)
-		log.Debugf("The store is empty. Got variable '%s' from environment. Result: '%s'", varName, result)
-		if err != nil {
-			log.Errorf("Got error while trying to get variable '%s' from environment: %s", varName, err)
-		}
-		return
-	}
-	log.Debugf("Got variable '%s' from store. Result: '%s'", varName, result)
-	return
 }
 
 func main() {

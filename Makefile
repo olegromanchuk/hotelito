@@ -21,6 +21,7 @@ test:
 	go test -race -coverprofile=profile.cov ./...
 	go tool cover -func=profile.cov
 	rm profile.cov
+	golangci-lint
 
 version:
 	@echo "branch: $(BRANCH), hash: $(HASH), timestamp: $(TIMESTAMP)"
