@@ -263,7 +263,7 @@ func TestCloudbeds_GetRooms(t *testing.T) {
 func TestRoom_SearchRoomIDByPhoneNumber(t *testing.T) {
 
 	log := logrus.New()
-	// Setup: create roomid_map.json file
+	// Setup: create config.json file
 	roomMapData := `{
 		"100": "544559-0",
 		"101": "544559-1"
@@ -368,7 +368,7 @@ func TestRoom_SearchRoomIDByPhoneNumber(t *testing.T) {
 		})
 	}
 
-	// Teardown: delete roomid_map.json file
+	// Teardown: delete roomid_map_test.json file
 	err = os.Remove("roomid_map_test.json")
 	if err != nil {
 		t.Errorf("unable to tear down test: %v", err)

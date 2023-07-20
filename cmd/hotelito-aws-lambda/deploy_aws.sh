@@ -4,7 +4,7 @@ set -o errexit
 
 ORIGINAL_FILE_3CX=../../3cx/src/crm-template-cloudbeds-3cx-template.xml
 FINAL_FILE_3CX=../../3cx/crm-template-cloudbeds-3cx.xml
-FILE_ROOMID_EXTENSION_MAP=../../roomid_map.json
+FILE_ROOMID_EXTENSION_MAP=../../config.json
 
 # if samconfig.toml doesn't exist - advise to run sam deploy --guided first
 if [ ! -f samconfig.toml ]; then
@@ -178,7 +178,7 @@ API_BASE_URL="https://${FUNC_NAME}.execute-api.${AWS_REGION}.amazonaws.com/Prod"
 # replace the TEMPLATE_API_URL on API_BASE_URL
 sed -i "" -e "s|TEMPLATE_API_URL|${API_BASE_URL}|" ${FINAL_FILE_3CX}
 
-# 6. Upload roomid_map.json to S3
+# 6. Upload config.json to S3
 # Set the bucket name variable
 echo "Uploading ${FILE_ROOMID_EXTENSION_MAP} to s3://${AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID}"
 # Upload the file to S3 bucket

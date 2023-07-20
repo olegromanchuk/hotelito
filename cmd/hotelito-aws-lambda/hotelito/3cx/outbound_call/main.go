@@ -95,12 +95,12 @@ func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayPro
 		}
 	}
 	log.Debugf("AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID: %s", awsBucketName)
-	log.Debugf("Fetching roomid_map.json from S3 bucket %s", awsBucketName)
+	log.Debugf("Fetching config.json from S3 bucket %s", awsBucketName)
 	//get information about mapping: room extension -- cloudbeds room ID
 	//fetchS3ObjectAndSaveToFile is a helper function to fetch object from S3 and save it to file
-	mapFullFileName, err := fetchS3ObjectAndSaveToFile(log, awsBucketName, "roomid_map.json") // Replace with your bucket name and the file name
+	mapFullFileName, err := fetchS3ObjectAndSaveToFile(log, awsBucketName, "config.json") // Replace with your bucket name and the file name
 	if err != nil || mapFullFileName == "" {
-		errMsg := fmt.Sprintf("failed to fetch object: %v. Check if AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID is set and S3 bucket with roomid_map.json exists", err)
+		errMsg := fmt.Sprintf("failed to fetch object: %v. Check if AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID is set and S3 bucket with config.json exists", err)
 		log.Error(errMsg)
 		return events.APIGatewayProxyResponse{
 			StatusCode: http.StatusInternalServerError,
@@ -120,7 +120,7 @@ func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayPro
 
 	//option via handler interface. Helpful for testing
 	//create 3cx client
-	pbx3cxClient := pbx3cx.New(log)
+	pbx3cxClient := pbx3cx.New(log, mapFullFileName)
 	//define handlers
 	h := handlers.NewHandler(log, pbx3cxClient, clbClient)
 
@@ -160,7 +160,7 @@ func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayPro
 	//get provider
 	hotelProvider := h.Hotel
 
-	msg, err := hotelProvider.UpdateRoom(room.PhoneNumber, room.RoomCondition, room.HouskeeperID, mapFullFileName)
+	msg, err := hotelProvider.UpdateRoom(room.PhoneNumber, room.RoomCondition, room.HousekeeperName, mapFullFileName)
 	if err != nil {
 		h.Log.Error(err)
 		return events.APIGatewayProxyResponse{
@@ -189,7 +189,7 @@ func fetchS3ObjectAndSaveToFile(log *logrus.Logger, bucket, fileName string) (fi
 
 	downloader := s3manager.NewDownloader(sess)
 	log.Tracef("Downloading %s from bucket %s", fileName, bucket)
-	file, err := os.Create("/tmp/roomid_map.json") //save file to current directory. Exists only for current lambda execution
+	file, err := os.Create("/tmp/config.json") //save file to current directory. Exists only for current lambda execution
 	if err != nil {
 		errMsg := fmt.Sprintf("Unable to open file %q for writing - %v", fileName, err)
 		log.Error(errMsg)
