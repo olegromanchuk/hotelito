@@ -23,6 +23,7 @@ type PBX3CX struct {
 	configMap *configuration.ConfigMap
 }
 
+// New creates new PBX3CX client
 func New(log *logrus.Logger, configMapInfo *configuration.ConfigMap) *PBX3CX {
 	log.Debugf("Creating new PBX3CX client")
 

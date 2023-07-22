@@ -57,7 +57,7 @@ Note, that the server with the app should have a public **valid** HTTPS endpoint
 Set a correct redirect URL. It should be  
 `https://mypublic.api.address/api/v1/callback`
 
-3. You will need to create a configuration file with the credentials (.env). Check .env_example for the list of required variables.  
+3. You will need to create a configuration file with the credentials (.env). Check env_example for the list of required variables.  
    PS. `APPLICATION_NAME` will be used in AWS Parameter Store path (if AWS lambda version is used).
 
 4. `CLOUDBEDS_REDIRECT_URL` should be set to the public IP address of the server plus "/api/v1/callback". On this URL Cloudbeds authentication server will send an authorization code as part of the authentication process [OAuth2](https://integrations.cloudbeds.com/hc/en-us/articles/360006450433-OAuth-2-0).
@@ -68,7 +68,7 @@ Set a correct redirect URL. It should be
 
 - Install Hotelito by downloading the latest release from the [Releases](https://github.com/olegromanchuk/hotelito/releases) page.
 
-- Create .env file that will contain all the configuration parameters. See included .env_example.   
+- Create .env file that will contain all the configuration parameters. See included env_example.   
 Notes on .env file:   
   * CLOUDBEDS_AUTH_URL and CLOUDBEDS_TOKEN_URL are Cloudbeds endpoints on 07/2023. They should not be changed unless Cloudbeds changes them.
   * all parameters started from "AWS" could be ignored for standalone version.
@@ -83,7 +83,7 @@ For more details check [GH-15](https://github.com/olegromanchuk/hotelito/issues/
 - Install AWS [cli](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) and AWS SAM [cli](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html).
 - [Configure](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html) AWS cli with your credentials
 - Install [Go 1.20.X](https://golang.org/doc/install)
-- Create .env file that contains all the configuration parameters. See included .env_example.  
+- Create .env file that contains all the configuration parameters. See included env_example.  
 Notes on .env file:
     * CLOUDBEDS_AUTH_URL and CLOUDBEDS_TOKEN_URL are Cloudbeds endpoints on 07/2023. They should not be changed unless Cloudbeds changes them.
 

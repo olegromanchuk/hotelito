@@ -25,6 +25,7 @@ builds:
         - goos: windows
           goarch: arm64
       dir: cmd/hotelito
+      ldflags: "-s -w -X main.revision={{.Tag}}-{{.ShortCommit}}-{{.CommitDate}}"
 
   
 archives:
@@ -44,3 +45,5 @@ archives:
       files:
         - LICENSE
         - README.md
+        - env_example
+        - config.json

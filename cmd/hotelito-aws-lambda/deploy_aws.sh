@@ -165,7 +165,6 @@ value="${CLOUDBEDS_REDIRECT_URL}"
 # update CLOUDBEDS_REDIRECT_URL in the Parameter Store
 echo "Setting ${path_prefix}/${path_prefix_env}/${name} in parameter store"
 aws ssm put-parameter \
-
   --profile ${AWS_CONFIG_PROFILE} \
   --name "${path_prefix}/${path_prefix_env}/${name}" \
   --type "SecureString" \
@@ -193,5 +192,6 @@ echo "------------------------------- OUTPUTS ----------------------------------
 echo
 echo "Set \"REDIRECT URL\" in cloudbeds to this value: ${CLOUDBEDS_REDIRECT_URL}"
 echo "For initial authentication run: https://${FUNC_NAME}.execute-api.${AWS_REGION}.amazonaws.com/Prod/api/v1"
+echo "S3 config.json file could be found here: s3://${AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID}/${FILE_ROOMID_EXTENSION_MAP}"
 echo "3CX template could be found here: ${FINAL_FILE_3CX} Import it in 3CX as a new template."
 echo
