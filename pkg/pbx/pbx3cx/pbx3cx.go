@@ -56,19 +56,22 @@ func (pbx3cx *PBX3CX) ProcessPBXRequest(jsonDecoder *json.Decoder) (room pbx.Roo
 	return room, nil
 }
 
+// processOutboundCall search for room by extension (agent=extension) and returns room information
 func (pbx3cx *PBX3CX) processOutboundCall(requestBody RequestBody) (room pbx.Room, err error) {
 	pbx3cx.log.Debugf("Processing outbound call from %s to %s", requestBody.Agent, requestBody.Number)
 
 	PhoneNumber4HouseKeeper := requestBody.Number //2222222221
 	RoomExtension := requestBody.Agent            //1001
 
-	//creating map of housekeeper numbers, so we can easily find housekeeper and room status by phone number
+	//creating map of housekeeper numbers(the number he called to), so we can easily find housekeeper and room status by phone number
+	//each housekeeper has his own number, where he calls. There are two numbers: for clean and dirty rooms.
+	//This number is mapped to the housekeeper name and room status
 	mapHousekeeperNumbers := make(map[string]configuration.Housekeeper)
 	for _, housekeeper := range pbx3cx.configMap.HousekeeperMap {
 		mapHousekeeperNumbers[housekeeper.PhoneNumber] = housekeeper
 	}
 
-	numberInformation := mapHousekeeperNumbers[PhoneNumber4HouseKeeper]
+	numberInformation := mapHousekeeperNumbers[PhoneNumber4HouseKeeper] //if not found we got empty map
 	pbx3cx.log.Debugf("found housekeeper number: %s. Housekeeper: %s. Room condition: %s", numberInformation.PhoneNumber, numberInformation.HousekeeperName, numberInformation.NumberType)
 	roomCondition := numberInformation.NumberType
 
