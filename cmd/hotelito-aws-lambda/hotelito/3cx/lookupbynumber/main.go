@@ -90,7 +90,7 @@ func HandleLookupByNumber(ctx context.Context, request events.APIGatewayProxyReq
 	pbx3cxClient := pbx3cx.New(log, configMap)
 	//define handlers
 	h := handlers.NewHandler(log, pbx3cxClient, clbClient)
-	jsonAsBytes, err := h.PBX.ProcessLookupByNumber(number)
+	jsonAsBytes, err := h.PBX.ProcessLookupByNumber(number)  //returns dummy contact with "number"
 	if err != nil {
 		log.Error(err)
 		return events.APIGatewayProxyResponse{

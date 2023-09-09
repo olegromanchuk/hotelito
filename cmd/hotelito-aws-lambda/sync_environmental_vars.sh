@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# This script is invoked from Makefile
+
 # Define the SAM template filename
 TEMPLATE_FILENAME="template.yaml"
 

@@ -8,7 +8,6 @@ import (
 	"github.com/olegromanchuk/hotelito/pkg/pbx"
 	"github.com/sirupsen/logrus"
 	"net/http"
-	"os"
 )
 
 type Handler struct {
@@ -83,7 +82,7 @@ func (h *Handler) Handle3cxCallInfo(w http.ResponseWriter, r *http.Request) {
 
 	//get provider
 	hotelProvider := h.Hotel
-	msg, err := hotelProvider.UpdateRoom(room.PhoneNumber, room.RoomCondition, room.HousekeeperName, os.Getenv("HOSPITALITY_PHONE2ROOM_MAP_FILENAME"))
+	msg, err := hotelProvider.UpdateRoom(room.PhoneNumber, room.RoomCondition, room.HousekeeperName)
 	if err != nil {
 		h.Log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -106,7 +105,7 @@ func (h *Handler) Handle3cxLookup(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	number := query.Get("Number")
 
-	jsonAsBytes, err := h.PBX.ProcessLookupByNumber(number)
+	jsonAsBytes, err := h.PBX.ProcessLookupByNumber(number) //returns dummy contact with "number"
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -136,7 +135,7 @@ func (h *Handler) HandleSetHousekeepingStatus(w http.ResponseWriter, r *http.Req
 	h.Log.Debugf("roomPhoneNumber: %s, housekeepingStatus: %s, housekeeperID: %s", roomPhoneNumber, housekeepingStatus, housekeeperID)
 	hotelProvider := h.Hotel
 	//roomPhoneNumber = 1001
-	msg, err := hotelProvider.UpdateRoom(roomPhoneNumber, housekeepingStatus, housekeeperID, os.Getenv("HOSPITALITY_PHONE2ROOM_MAP_FILENAME"))
+	msg, err := hotelProvider.UpdateRoom(roomPhoneNumber, housekeepingStatus, housekeeperID)
 	if err != nil {
 		h.Log.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)

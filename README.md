@@ -82,11 +82,10 @@ For more details check [GH-15](https://github.com/olegromanchuk/hotelito/issues/
 
 - Install AWS [cli](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) and AWS SAM [cli](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html).
 - [Configure](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html) AWS cli with your credentials
-- Install [Go 1.20.X](https://golang.org/doc/install)
+- Install [Go 1.21.X](https://golang.org/doc/install)
 - Create .env file that contains all the configuration parameters. See included env_example.  
 Notes on .env file:
     * CLOUDBEDS_AUTH_URL and CLOUDBEDS_TOKEN_URL are Cloudbeds endpoints on 07/2023. They should not be changed unless Cloudbeds changes them.
-
     * CLOUDBEDS_REDIRECT_URL will be determined after lambda installation. You can leave it as "it is" for now.
     * PORT parameter is not used in AWS lambda version.
     * LOG_LEVEL: acceptable values are [Trace, Debug, Info, Warning, Error, Fatal, Panic]
@@ -179,6 +178,10 @@ Standalone version located in cmd/hotelito. AWS Lambda version located in cmd/ho
 
 Shared code is located in `internal` and `pkg` directories.
 
+### Adding new variabled to .env file
+If you need to add new variables to .env file, you need to add them only to the .env  
+`sync_environmental_vars.sh` will sync .env file => environmental_vars.json. It is not needed to update environmental_vars.json manually.
+
 ### Local testing standalone on localhost
 ```
 go build -o cmd/hotelito/hotelito cmd/hotelito/main.go
@@ -193,6 +196,9 @@ echo "make sure that .env file is present in the current directory and contains 
 ```
 
 ### Local testing AWS
+
+Use Makefile from /cmd/hotelito-aws-lambda directory.  
+`sync_environmental_vars.sh` will sync .env file => environmental_vars.json. It is not needed to update environmental_vars.json manually.
 ```
 cd app/
 make build
@@ -216,7 +222,7 @@ deploy_aws.sh will check on this line and if it is not set will propose to use "
 ##### Consideration about aws parameter store:
 The decision to create parameter store variables in a bash script "deploy aws", not in a template.yaml was made because of the following reason: AWS does not support creating secureString in template.yml
 
-### New function
+### New lambda function
 To add new function follow the next steps:
 1. create a file with handler function in proper directory
 2. add section to template.yaml. Set function name (3CXOutboundCallFunction) , CodeUri, Events->Properties->Path, Events->Properties->Method
@@ -224,7 +230,7 @@ To add new function follow the next steps:
 
 
 ## TODO
-[x] makefile
-[x] workflows
-[x] TODO moved to GH Issues
-[x] workflows
+[x] makefile  
+[x] workflows  
+[x] TODO moved to GH Issues  
+[x] workflows  

@@ -72,8 +72,6 @@ func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayPro
 	}
 	log.Debugf("AWS_REGION: %s", awsRegion)
 
-	//AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID - see below
-
 	storePrefix := fmt.Sprintf("%s/%s", appName, environmentType) //hotelito-app-production
 	//current secret store - aws env variables
 	storeClient, err := awsstore.Initialize(log, storePrefix, awsRegion)
@@ -96,6 +94,7 @@ func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayPro
 		}
 	}
 	log.Debugf("AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID: %s", awsBucketName)
+
 	log.Debugf("Fetching config.json from S3 bucket %s", awsBucketName)
 	//get information about mapping: room extension -- cloudbeds room ID
 	//fetchS3ObjectAndSaveToFile is a helper function to fetch object from S3 and save it to file
@@ -109,8 +108,21 @@ func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayPro
 		}, nil
 	}
 
+	log.Debugf("Fetching config.json from S3 bucket %s", awsBucketName)
+	//get information about mapping: room extension -- cloudbeds room ID
+	//fetchS3ObjectAndSaveToFile is a helper function to fetch object from S3 and save it to file
+	clBedsApiConfigFile, err := fetchS3ObjectAndSaveToFile(log, awsBucketName, "cloudbeds_api_params.json") // Replace with your bucket name and the file name
+	if err != nil || mapFullFileName == "" {
+		errMsg := fmt.Sprintf("failed to fetch object: %v. Check if AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID is set and S3 bucket with config.json exists", err)
+		log.Error(errMsg)
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       errMsg,
+		}, nil
+	}
+
 	//parse config.json
-	configMap, err := configuration.New(log, mapFullFileName)
+	configMap, err := configuration.New(log, mapFullFileName, clBedsApiConfigFile)
 	if err != nil {
 		log.Fatal(err) //TODO: add error handling. Try to load previous version of configMap
 	}
@@ -148,6 +160,10 @@ func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayPro
 			h.Log.Debugf("Ignoring incoming call")
 			return events.APIGatewayProxyResponse{StatusCode: http.StatusOK}, nil
 		}
+		if err.Error() == "outgoing-regular-call-ignoring" { //regular outbound call is not related to room status
+			h.Log.Debugf("Ignoring regular outgoing call")
+			return events.APIGatewayProxyResponse{StatusCode: http.StatusOK}, nil
+		}
 		h.Log.Error(err)
 		log.Error(err)
 		return events.APIGatewayProxyResponse{
@@ -167,7 +183,7 @@ func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayPro
 	//get provider
 	hotelProvider := h.Hotel
 
-	msg, err := hotelProvider.UpdateRoom(room.PhoneNumber, room.RoomCondition, room.HousekeeperName, mapFullFileName)
+	msg, err := hotelProvider.UpdateRoom(room.PhoneNumber, room.RoomCondition, room.HousekeeperName)
 	if err != nil {
 		h.Log.Error(err)
 		return events.APIGatewayProxyResponse{

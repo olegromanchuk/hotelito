@@ -24,7 +24,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 
 func main() {
 
-	//load env variables
+	//load .env variables into environment
 	readAuthVarsFromFile()
 
 	//define logger
@@ -59,7 +59,9 @@ func main() {
 
 	//parse config.json
 	mapFileName := os.Getenv("HOSPITALITY_PHONE2ROOM_MAP_FILENAME")
-	configMap, err := configuration.New(log, mapFileName)
+	CloudbedsApiConfFileName := os.Getenv("HOSPITALITY_API_CONF_FILENAME")
+
+	configMap, err := configuration.New(log, mapFileName, CloudbedsApiConfFileName)
 	if err != nil {
 		log.Fatal(err) //TODO: add error handling. Try to load previous version of configMap
 	}

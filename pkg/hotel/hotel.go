@@ -79,7 +79,7 @@ type Room struct {
 type HospitalityProvider interface {
 	GetRooms() ([]Room, error)
 	GetRoom(roomNumber string, mapFileName string) (Room, error)
-	UpdateRoom(roomNumber, housekeepingStatus, housekeeperName string, mapFileName string) (msg string, err error)
+	UpdateRoom(roomNumber, housekeepingStatus, housekeeperName string) (msg string, err error)
 	HandleOAuthCallback(state, code string) (err error)
 	HandleInitialLogin() (url string, err error)
 }

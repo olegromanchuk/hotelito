@@ -17,18 +17,19 @@ type Extension struct {
 
 // Housekeeper represents the housekeeper mapping
 type Housekeeper struct {
-	PhoneNumber     string `json:"phone_number"`
-	HousekeeperName string `json:"housekeeper_name"`
-	NumberType      string `json:"number_type"`
+	RoomStatusPhoneNumber string `json:"room_status_phone_number"`
+	HousekeeperName       string `json:"housekeeper_name"`
+	NumberType            string `json:"number_type"`
 }
 
 // ConfigMap contains arrays of Extension and Housekeeper
 type ConfigMap struct {
 	ExtensionMap   []Extension   `json:"extension_map"`
 	HousekeeperMap []Housekeeper `json:"housekeeper_map"`
+	ApiCfgFileName string        `json:"api_config_file_name"`
 }
 
-func New(log *logrus.Logger, mapFileName string) (*ConfigMap, error) {
+func New(log *logrus.Logger, mapFileName string, clBedsApiConfigFile string) (*ConfigMap, error) {
 	configMapInfo := &ConfigMap{}
 	//get configuration from mapFileName
 	//process configuration file
@@ -46,5 +47,6 @@ func New(log *logrus.Logger, mapFileName string) (*ConfigMap, error) {
 		log.Errorf(errMsg.Error())
 		return configMapInfo, errMsg
 	}
+	configMapInfo.ApiCfgFileName = clBedsApiConfigFile
 	return configMapInfo, nil
 }

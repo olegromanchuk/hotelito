@@ -1,0 +1,10 @@
+{
+  "apiURLs": {
+    "getRooms": "https://hotels.cloudbeds.com/api/v1.2/getRooms",
+    "postHousekeepingStatus": "https://hotels.cloudbeds.com/api/v1.2/postHousekeepingStatus"
+  },
+  "roomStatuses": [
+    "clean",
+    "dirty"
+    ]
+}
