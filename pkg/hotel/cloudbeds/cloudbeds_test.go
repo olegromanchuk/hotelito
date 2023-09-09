@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"reflect"
 	"testing"
@@ -464,36 +465,97 @@ func TestCloudbeds_postHousekeepingStatus(t *testing.T) {
 
 }
 
-//
-//func TestCloudbeds_postHousekeepingStatus1(t *testing.T) {
-//	type fields struct {
-//		httpClient  HTTPClient
-//		storeClient secrets.SecretsStore
-//		log         *logrus.Logger
-//	}
-//	type args struct {
-//		roomID        string
-//		roomCondition string
-//	}
-//	tests := []struct {
-//		name    string
-//		fields  fields
-//		args    args
-//		wantErr assert.ErrorAssertionFunc
-//	}{
-//		// TODO: Add test cases.
-//	}
-//	for _, tt := range tests {
-//		t.Run(tt.name, func(t *testing.T) {
-//			p := &Cloudbeds{
-//				httpClient:  tt.fields.httpClient,
-//				storeClient: tt.fields.storeClient,
-//				log:         tt.fields.log,
-//			}
-//			tt.wantErr(t, p.postHousekeepingStatus(tt.args.roomID, tt.args.roomCondition), fmt.Sprintf("postHousekeepingStatus(%v, %v)", tt.args.roomID, tt.args.roomCondition))
-//		})
-//	}
-//}
+func TestUpdateRoom(t *testing.T) {
+	// Create a mock HTTP server
+	postURL := "/api/v1.1/updateRoomCondition"
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check that the request is a POST request
+		assert.Equal(t, http.MethodPost, r.Method)
+
+		// Check that the request URL matches the expected URL
+		assert.Equal(t, postURL, r.URL.Path)
+
+		// Check that the request body contains the expected JSON payload
+		expectedBody := "roomCondition=clean&roomID=544559-0"
+		bodyBytes, err := io.ReadAll(r.Body)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedBody, string(bodyBytes))
+
+		// Return a successful response
+		w.WriteHeader(http.StatusOK)
+		_, err = w.Write([]byte(`{"success":true,"data":{"date":"2022-01-01","roomID":"123","roomCondition":"clean","doNotDisturb":false}}`))
+		assert.NoError(t, err)
+	}))
+	defer mockServer.Close()
+
+	tests := []struct {
+		name          string
+		roomExtension string
+		condition     string
+		expectedMsg   string
+		expectErr     bool
+		errMsg        string
+	}{
+		{
+			"Valid Room 1",
+			"123",
+			"clean",
+			"Finish UpdateRoom successfully updated room 123 to clean",
+			false,
+			"",
+		},
+		{
+			"Invalid Room 1",
+			"invalid",
+			"clean",
+			"",
+			true,
+			"phone number invalid not found",
+		},
+		{
+			"Invalid Room 2",
+			"123",
+			"dristed",
+			"",
+			true,
+			"room condition dristed is not valid",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Your existing setup
+			cb := &Cloudbeds{
+				httpClient:                   mockServer.Client(),
+				log:                          logrus.New(),
+				apiUrlPostHousekeepingStatus: mockServer.URL + "/api/v1.1/updateRoomCondition",
+				roomStatuses:                 []string{"clean", "dirty"},
+				configMap: &configuration.ConfigMap{
+					ExtensionMap: []configuration.Extension{
+						{
+							RoomExtension:       "123",
+							HospitalityRoomID:   "544559-0",
+							HospitalityRoomName: "DQ(1)",
+						},
+					},
+				},
+			}
+
+			// Call the UpdateRoom function with test data
+			msg, err := cb.UpdateRoom(tt.roomExtension, tt.condition, "John Doe")
+
+			// Check the function's output
+			if tt.expectErr {
+				assert.Error(t, err)
+				assert.Equal(t, tt.errMsg, err.Error())
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedMsg, msg)
+			}
+		})
+	}
+
+}
 
 // Add your test cases
 func TestCloudbeds_setOauth2Config(t *testing.T) {
@@ -574,4 +636,290 @@ func TestCloudbeds_setOauth2Config(t *testing.T) {
 			tt.wantErr(t, p.setOauth2Config(), "setOauth2Config()")
 		})
 	}
+}
+
+func TestGetRoom(t *testing.T) {
+	tests := []struct {
+		name           string
+		roomNumber     string
+		extensionMap   []configuration.Extension
+		expectedRoom   hotel.Room
+		expectedErrMsg string
+	}{
+		{
+			name:       "Valid room number",
+			roomNumber: "123",
+			extensionMap: []configuration.Extension{
+				{
+					RoomExtension:       "123",
+					HospitalityRoomID:   "544559-0",
+					HospitalityRoomName: "DQ(1)",
+				},
+			},
+			expectedRoom: hotel.Room{
+				RoomID:      "544559-0",
+				PhoneNumber: "123",
+			},
+		},
+		{
+			name:           "Invalid room number",
+			roomNumber:     "invalid",
+			extensionMap:   []configuration.Extension{},
+			expectedErrMsg: "phone number invalid not found",
+		},
+		{
+			name:           "Empty room number",
+			roomNumber:     "",
+			extensionMap:   []configuration.Extension{},
+			expectedErrMsg: "phone number  not found",
+		},
+		{
+			name:       "No matching room extension",
+			roomNumber: "999",
+			extensionMap: []configuration.Extension{
+				{
+					RoomExtension:       "123",
+					HospitalityRoomID:   "544559-0",
+					HospitalityRoomName: "DQ(1)",
+				},
+			},
+			expectedErrMsg: "phone number 999 not found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cb := &Cloudbeds{
+				log: logrus.New(),
+				configMap: &configuration.ConfigMap{
+					ExtensionMap: tt.extensionMap,
+				},
+			}
+
+			actualRoom, err := cb.GetRoom(tt.roomNumber, "map.json")
+			if tt.expectedErrMsg != "" {
+				assert.Error(t, err)
+				assert.Equal(t, tt.expectedErrMsg, err.Error())
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedRoom, actualRoom)
+			}
+		})
+	}
+}
+
+func TestGenerateRandomString(t *testing.T) {
+	tests := []struct {
+		name        string
+		length      int
+		expectedErr error
+	}{
+		{
+			name:   "Generate string of length 8",
+			length: 8,
+		},
+		{
+			name:   "Generate string of length 16",
+			length: 16,
+		},
+		{
+			name:   "Generate string of length 0",
+			length: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cb := &Cloudbeds{
+				log: logrus.New(),
+			}
+			str := cb.generateRandomString(tt.length)
+
+			// In our case, the random string is hexadecimal, so each byte generates two characters
+			assert.Equal(t, tt.length*2, len(str))
+		})
+	}
+}
+
+type MockSecretStore struct {
+	mock.Mock
+}
+
+func (m *MockSecretStore) StoreAccessToken(token string) error {
+	args := m.Called(token)
+	return args.Error(0)
+}
+
+func (m *MockSecretStore) StoreRefreshToken(token string) error {
+	args := m.Called(token)
+	return args.Error(0)
+}
+
+func (m *MockSecretStore) RetrieveAccessToken() (string, error) {
+	args := m.Called()
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockSecretStore) RetrieveRefreshToken() (string, error) {
+	args := m.Called()
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockSecretStore) StoreOauthState(state string) error {
+	args := m.Called(state)
+	return args.Error(0)
+}
+
+func (m *MockSecretStore) RetrieveOauthState(state string) (string, error) {
+	args := m.Called(state)
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockSecretStore) RetrieveVar(varName string) (string, error) {
+	args := m.Called(varName)
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockSecretStore) Close() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
+// Implement other methods if necessary
+
+func TestGetVarFromStoreOrEnvironment(t *testing.T) {
+	tests := []struct {
+		name           string
+		storeValue     string
+		storeErr       error
+		envValue       string
+		expectedResult string
+	}{
+		{
+			name:           "from store",
+			storeValue:     "store_value",
+			storeErr:       nil,
+			envValue:       "env_value",
+			expectedResult: "store_value",
+		},
+		{
+			name:           "from environment",
+			storeValue:     "",
+			storeErr:       nil,
+			envValue:       "env_value",
+			expectedResult: "env_value",
+		},
+		{
+			name:           "error case",
+			storeValue:     "",
+			storeErr:       fmt.Errorf("some error"),
+			envValue:       "env_value",
+			expectedResult: "env_value",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup
+			mockStore := new(MockSecretStore)
+			mockStore.On("RetrieveVar", mock.Anything).Return(tt.storeValue, tt.storeErr)
+
+			cloudbeds := &Cloudbeds{
+				storeClient: mockStore,
+				log:         logrus.New(),
+			}
+
+			// Set environment variable
+			os.Setenv("TEST_VAR", tt.envValue)
+			defer os.Unsetenv("TEST_VAR")
+
+			// Execute
+			result := cloudbeds.getVarFromStoreOrEnvironment("TEST_VAR")
+
+			// Verify
+			assert.Equal(t, tt.expectedResult, result)
+			mockStore.AssertExpectations(t)
+		})
+	}
+}
+
+func TestLoadApiConfiguration(t *testing.T) {
+
+	// Create testdata directory if it does not exist
+	if _, err := os.Stat("testdata"); os.IsNotExist(err) {
+		_ = os.Mkdir("testdata", 0755)
+	}
+
+	type APIURLs struct {
+		GetRooms               string `json:"getRooms"`
+		PostHousekeepingStatus string `json:"postHousekeepingStatus"`
+	}
+
+	tests := []struct {
+		name           string
+		jsonData       string
+		apiConfigPath  string
+		expectedResult *ApiConfiguration3CX
+		wantError      assert.ErrorAssertionFunc
+	}{
+		{
+			name:          "failed to parse config to struct",
+			jsonData:      "",
+			apiConfigPath: "",
+			expectedResult: &ApiConfiguration3CX{
+				APIURLs: APIURLs{
+					GetRooms:               "",
+					PostHousekeepingStatus: "",
+				},
+				RoomStatuses: nil,
+			},
+			wantError: assert.Error,
+		},
+		{
+			name: "cant parse config to struct",
+			jsonData: `{
+		"apiURLs": {
+			"getRooms": "https://hotels.cloudbeds.com/api/v1.2/getRooms",
+			"postHousekeepingStatus": "https://hotels.cloudbeds.com/api/v1.2/postHousekeepingStatus"
+		},
+		"roomStatuses": ["clean", "dirty"]
+	}`,
+			apiConfigPath: "testdata/cloudbeds_api_params.json",
+			expectedResult: &ApiConfiguration3CX{
+				APIURLs: APIURLs{
+					GetRooms:               "https://hotels.cloudbeds.com/api/v1.2/getRooms",
+					PostHousekeepingStatus: "https://hotels.cloudbeds.com/api/v1.2/postHousekeepingStatus",
+				},
+				RoomStatuses: []string{"clean", "dirty"},
+			},
+			wantError: assert.NoError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			apiConfigPath := "testdata/cloudbeds_api_params.json"
+			// Create and write the JSON data to a test file
+			err := os.WriteFile("testdata/cloudbeds_api_params.json", []byte(tt.jsonData), 0644)
+			if err != nil {
+				t.Fatalf("Could not create test file: %v", err)
+			}
+
+			// Setup logger and run the test function
+			log := logrus.New()
+			apiConfiguration, err := loadApiConfiguration(log, tt.apiConfigPath)
+
+			// Assertions
+			tt.wantError(t, err)
+			assert.Equal(t, tt.expectedResult, apiConfiguration)
+
+			// Clean up: remove the test file
+			os.Remove(apiConfigPath)
+		})
+	}
+
+	//remove test directory if any
+	os.Remove("testdata")
+
 }

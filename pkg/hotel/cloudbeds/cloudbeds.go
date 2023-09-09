@@ -2,6 +2,7 @@ package cloudbeds
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -11,12 +12,11 @@ import (
 	"github.com/olegromanchuk/hotelito/pkg/secrets"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
-	"math/rand"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
-	"time"
 )
 
 type Room struct {
@@ -52,12 +52,14 @@ type HTTPClient interface {
 
 // Cloudbeds is used to make requests to Cloudbeds API. httpClient contains pre-authorized http.Client that is set by the package oauth2 during authorization process. In tests we just mock this client to imitate cloudbeds API responses.
 type Cloudbeds struct {
-	httpClient  HTTPClient
-	storeClient secrets.SecretsStore
-	log         *logrus.Logger
-	refresher   TokenRefresher
-	oauthConf   *oauth2.Config
-	configMap   *configuration.ConfigMap
+	httpClient                   HTTPClient
+	storeClient                  secrets.SecretsStore
+	log                          *logrus.Logger
+	refresher                    TokenRefresher
+	oauthConf                    *oauth2.Config
+	configMap                    *configuration.ConfigMap
+	apiUrlPostHousekeepingStatus string
+	roomStatuses                 []string
 }
 
 // TokenRefresher is needed for mocking http requests in tests. This is the only reason to create this interface. Cloudbeds implements this interface
@@ -117,6 +119,14 @@ func (r Room) ToHotelRoom() hotel.Room {
 	}
 }
 
+type ApiConfiguration3CX struct {
+	APIURLs struct {
+		GetRooms               string `json:"getRooms"`
+		PostHousekeepingStatus string `json:"postHousekeepingStatus"`
+	} `json:"apiURLs"`
+	RoomStatuses []string `json:"roomStatuses"`
+}
+
 func (p *Cloudbeds) GetRooms() (rooms []hotel.Room, err error) {
 	p.log.Debugf("getting rooms")
 	respBody := &ResponseGetRooms{}
@@ -174,23 +184,24 @@ func (p *Cloudbeds) GetRooms() (rooms []hotel.Room, err error) {
 //	return nil
 //}
 
-func (p *Cloudbeds) CancelReservation(reservationID string) error {
-	// Provider1's implementation of CancelReservation
-	return nil
-}
-
-func (p *Cloudbeds) UpdateRoom(roomNumber, housekeepingStatus, housekeeperName string, mapFileName string) (msg string, err error) {
-	p.log.Debugf("Start UpdateRoom %s to %s for %s", roomNumber, housekeepingStatus, housekeeperName)
+func (p *Cloudbeds) UpdateRoom(roomExtensionNumber, housekeepingStatus, housekeeperName string) (msg string, err error) {
+	p.log.Debugf("Start UpdateRoom %s to %s for %s", roomExtensionNumber, housekeepingStatus, housekeeperName)
 
 	//get room id
 	room := &Room{}
-	room.PhoneNumber = roomNumber
-	roomID, err := room.SearchRoomIDByPhoneNumber(p.log, roomNumber, p.configMap.ExtensionMap)
+	room.PhoneNumber = roomExtensionNumber
+	roomID, err := room.SearchRoomIDByPhoneNumber(p.log, roomExtensionNumber, p.configMap.ExtensionMap)
 	if err != nil {
 		p.log.Error(err)
 		return msg, err
 	}
 	room.RoomID = roomID
+
+	if !p.checkIfRoomConditionValid(housekeepingStatus) {
+		errMsg := fmt.Sprintf("room condition %s is not valid", housekeepingStatus)
+		p.log.Error(errMsg)
+		return "", errors.New(errMsg)
+	}
 
 	// Update the room condition
 	err = p.postHousekeepingStatus(room.RoomID, housekeepingStatus)
@@ -198,7 +209,7 @@ func (p *Cloudbeds) UpdateRoom(roomNumber, housekeepingStatus, housekeeperName s
 		p.log.Error(err)
 		return msg, err
 	}
-	msg = fmt.Sprintf("Finish UpdateRoom successfully updated room %s to %s", roomNumber, housekeepingStatus)
+	msg = fmt.Sprintf("Finish UpdateRoom successfully updated room %s to %s", roomExtensionNumber, housekeepingStatus)
 	p.log.Debugf(msg)
 	return msg, nil
 }
@@ -376,13 +387,26 @@ func (p *Cloudbeds) HandleOAuthCallback(state, code string) (err error) {
 
 func New(log *logrus.Logger, secretStore secrets.SecretsStore, configMapInfo *configuration.ConfigMap) (*Cloudbeds, error) {
 	log.Debugf("Creating new Cloudbeds client")
+
+	apiConfigurationFileName := "cloudbeds_api_params.json"
+	apiConfiguration, err := loadApiConfiguration(log, apiConfigurationFileName)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+
 	cloudbedsClient := &Cloudbeds{
 		log:         log,
 		oauthConf:   &oauth2.Config{},
 		storeClient: secretStore,
 		configMap:   configMapInfo,
 	}
-	err := cloudbedsClient.setOauth2Config()
+
+	//get current api parameters for cloudbeds from config file
+	cloudbedsClient.apiUrlPostHousekeepingStatus = apiConfiguration.APIURLs.PostHousekeepingStatus
+	cloudbedsClient.roomStatuses = apiConfiguration.RoomStatuses
+
+	err = cloudbedsClient.setOauth2Config()
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -391,7 +415,6 @@ func New(log *logrus.Logger, secretStore secrets.SecretsStore, configMapInfo *co
 	//refresher was created as interface to make the code more testable
 
 	//get access_token
-
 	//check if access_token is valid. If not - get refresh_token and update access_token
 	accessToken, err := cloudbedsClient.storeClient.RetrieveAccessToken()
 	if err != nil || accessToken == "" {
@@ -408,6 +431,24 @@ func New(log *logrus.Logger, secretStore secrets.SecretsStore, configMapInfo *co
 	cloudbedsClient.httpClient = cloudbedsClient.oauthConf.Client(context.Background(), token)
 
 	return cloudbedsClient, nil
+}
+
+func loadApiConfiguration(log *logrus.Logger, apiConfigurationFileName string) (apiConfiguration *ApiConfiguration3CX, err error) {
+	apiConfiguration = &ApiConfiguration3CX{}
+	file, err := os.Open(apiConfigurationFileName)
+	if err != nil {
+		errMsg := fmt.Errorf("error opening config file: %s", err.Error())
+		log.Errorf(errMsg.Error())
+	}
+	defer file.Close()
+	byteValue, _ := io.ReadAll(file)
+	err = json.Unmarshal(byteValue, apiConfiguration)
+	if err != nil {
+		errMsg := fmt.Errorf("error unmarshalling config file %s: %s", apiConfigurationFileName, err.Error())
+		log.Errorf(errMsg.Error())
+		return apiConfiguration, errMsg
+	}
+	return apiConfiguration, nil
 }
 
 func NewClient4CallbackAndInit(log *logrus.Logger, secretStore secrets.SecretsStore) (*Cloudbeds, error) {
@@ -436,7 +477,12 @@ func (p *Cloudbeds) Close() error {
 }
 
 func (p *Cloudbeds) postHousekeepingStatus(roomID string, roomCondition string) (errorStatusCodeMsg error) {
-	apiUrl := "https://hotels.cloudbeds.com/api/v1.1/postHousekeepingStatus"
+	apiUrl := p.apiUrlPostHousekeepingStatus
+	//TODO - move urlConfiguration to configMap and load from separate cloudbeds_api_url.txt config file
+	if apiUrl == "" {
+		apiUrl = "https://hotels.cloudbeds.com/api/v1.1/postHousekeepingStatus" // default value
+	}
+
 	p.log.Infof("Posting housekeeping assignment for room %s with condition: %s", roomID, roomCondition)
 
 	reqBody := UpdateRoomConditionRequest{
@@ -503,6 +549,18 @@ func (p *Cloudbeds) postHousekeepingStatus(roomID string, roomCondition string) 
 	p.log.Debugf("HttpCode: %s. Response data: %v", resp.Status, respBody.Data)
 
 	return nil
+}
+
+func (p *Cloudbeds) checkIfRoomConditionValid(roomCondition string) bool {
+	p.log.Debugf("Checking if room condition %s is valid", roomCondition)
+	for _, status := range p.roomStatuses {
+		if status == roomCondition {
+			p.log.Debugf("Room condition %s is valid", roomCondition)
+			return true
+		}
+	}
+	p.log.Debugf("Room condition %s is not valid", roomCondition)
+	return false
 }
 
 func (r *Room) SearchRoomIDByPhoneNumber(log *logrus.Logger, phoneNumber string, extensionsInfo []configuration.Extension) (string, error) {
@@ -575,13 +633,14 @@ func (p *Cloudbeds) getVarFromStoreOrEnvironment(varName string) (result string)
 func (p *Cloudbeds) generateRandomString(length int) string {
 	bytes := make([]byte, length)
 	p.log.Debugf("Generating random string of length %d", length)
-	// Seed the random number generator with the current time
-	//
-	rand.Seed(time.Now().UnixNano())
 
-	if _, err := rand.Read(bytes); err != nil {
-		p.log.Fatal(err)
+	_, err := io.ReadFull(rand.Reader, bytes)
+	if err != nil {
+		p.log.Errorf(err.Error())
+		bytes = []byte("default")
 	}
-	p.log.Debugf("Generated random string: %s", hex.EncodeToString(bytes))
-	return hex.EncodeToString(bytes)
+
+	randomStr := hex.EncodeToString(bytes)
+	p.log.Debugf("Generated random string: %s", randomStr)
+	return randomStr
 }

@@ -18,22 +18,22 @@
   ],
   "housekeeper_map": [
     {
-      "phone_number": "2222222221",
+      "room_status_phone_number": "2222222221",
       "housekeeper_name": "Michael Jackson",
       "number_type": "dirty"
     },
     {
-      "phone_number": "2222222222",
+      "room_status_phone_number": "2222222222",
       "housekeeper_name": "Michael Jackson",
       "number_type": "clean"
     },
     {
-      "phone_number": "2222222232",
+      "room_status_phone_number": "2222222232",
       "housekeeper_name": "Madonna",
       "number_type": "dirty"
     },
     {
-      "phone_number": "2222222233",
+      "room_status_phone_number": "2222222233",
       "housekeeper_name": "Madonna",
       "number_type": "clean"
     }
