@@ -20,7 +20,7 @@ test:
 	go clean -testcache
 	go test -race -coverprofile=profile.cov ./...
 	go tool cover -func=profile.cov
-	#rm profile.cov
+	rm profile.cov
 	golangci-lint run
 
 version:

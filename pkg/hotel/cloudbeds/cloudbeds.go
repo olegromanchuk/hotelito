@@ -59,6 +59,7 @@ type Cloudbeds struct {
 	oauthConf                    *oauth2.Config
 	configMap                    *configuration.ConfigMap
 	apiUrlPostHousekeepingStatus string
+	apiUrlGetRooms               string
 	roomStatuses                 []string
 }
 
@@ -129,8 +130,14 @@ type ApiConfiguration3CX struct {
 
 func (p *Cloudbeds) GetRooms() (rooms []hotel.Room, err error) {
 	p.log.Debugf("getting rooms")
+	apiUrl := p.apiUrlGetRooms
+	//TODO - move urlConfiguration to configMap and load from separate cloudbeds_api_url.txt config file
+	if apiUrl == "" {
+		apiUrl = "https://hotels.cloudbeds.com/api/v1.2/getRooms" // default value
+	}
+
 	respBody := &ResponseGetRooms{}
-	resp, err := p.httpClient.Get("https://hotels.cloudbeds.com/api/v1.1/getRooms")
+	resp, err := p.httpClient.Get(apiUrl)
 	if err != nil {
 		p.log.Errorf("request failed with: %s", err)
 		return rooms, fmt.Errorf("request failed with: %s", err)
@@ -152,8 +159,8 @@ func (p *Cloudbeds) GetRooms() (rooms []hotel.Room, err error) {
 			p.log.Debugf("Failed to update room status: %s", respBody.Message)
 			return rooms, err
 		}
-		rooms, err = p.GetRooms()
-		if err != nil { //might be access_token expired. Try to refresh it
+		rooms, err = p.GetRooms() //recursive call. Not testable
+		if err != nil {           //might be access_token expired. Try to refresh it
 			p.log.Debugf("Failed to update room status after token refresh: %s", respBody.Message)
 			return rooms, err
 		} else {
@@ -404,6 +411,7 @@ func New(log *logrus.Logger, secretStore secrets.SecretsStore, configMapInfo *co
 
 	//get current api parameters for cloudbeds from config file
 	cloudbedsClient.apiUrlPostHousekeepingStatus = apiConfiguration.APIURLs.PostHousekeepingStatus
+	cloudbedsClient.apiUrlGetRooms = apiConfiguration.APIURLs.GetRooms
 	cloudbedsClient.roomStatuses = apiConfiguration.RoomStatuses
 
 	err = cloudbedsClient.setOauth2Config()

@@ -2,6 +2,8 @@ package cloudbeds
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/olegromanchuk/hotelito/internal/configuration"
 	"github.com/olegromanchuk/hotelito/pkg/hotel"
@@ -73,7 +75,7 @@ func (m *MockTokenRefresher) refreshToken() error {
 	return fmt.Errorf("refresh token error")
 }
 
-func TestRoom_ToHotelRoom(t *testing.T) {
+func TestCloudbeds_Room_ToHotelRoom(t *testing.T) {
 	type fields struct {
 		RoomID            string
 		RoomName          string
@@ -191,78 +193,210 @@ func (m *MockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	return args.Get(0).(*http.Response), args.Error(1)
 }
 
+//func TestCloudbeds_GetRooms(t *testing.T) {
+//
+//	// Define the JSON response
+//	responseJSON := `{
+//		"success": true,
+//		"data": [
+//			{
+//				"propertyID": "297652",
+//				"rooms": [
+//					{
+//						"roomID": "544559-0",
+//						"roomName": "DQ(1)",
+//						"roomDescription": "",
+//						"maxGuests": 2,
+//						"isPrivate": true,
+//						"roomBlocked": false,
+//						"roomTypeID": 544559,
+//						"roomTypeName": "Deluxe Queen",
+//						"roomTypeNameShort": "DQ"
+//					}
+//				]
+//			}
+//		],
+//		"count": 1,
+//		"total": 1
+//	}`
+//
+//	// Create a mock http.Response
+//	resp := &http.Response{
+//		StatusCode: 200,
+//		Body:       io.NopCloser(bytes.NewBufferString(responseJSON)),
+//	}
+//
+//	// Create a mock HTTPClient
+//	mockClient := new(MockHTTPClient)
+//	mockClient.On("Get", "https://hotels.cloudbeds.com/api/v1.1/getRooms").Return(resp, nil)
+//
+//	// Create a Cloudbeds instance with the mock HTTPClient
+//	cb := &Cloudbeds{
+//		httpClient: mockClient,
+//		log:        logrus.New(),
+//	}
+//
+//	// Call GetRooms
+//	rooms, err := cb.GetRooms()
+//
+//	// Assert no error occurred
+//	assert.Nil(t, err)
+//
+//	// Assert the Get function was called exactly once with the expected URL
+//	mockClient.AssertCalled(t, "Get", "https://hotels.cloudbeds.com/api/v1.1/getRooms")
+//
+//	// Test that the response was correctly parsed
+//	expectedRoom := hotel.Room{
+//		RoomID:            "544559-0",
+//		RoomName:          "DQ(1)",
+//		RoomDescription:   "",
+//		MaxGuests:         2,
+//		IsPrivate:         true,
+//		RoomBlocked:       false,
+//		RoomTypeID:        544559,
+//		RoomTypeName:      "Deluxe Queen",
+//		RoomTypeNameShort: "DQ",
+//		PhoneNumber:       "",
+//		RoomCondition:     "",
+//		RoomOccupied:      false,
+//	}
+//
+//	assert.Equal(t, expectedRoom, rooms[0], "Expected room: %v, got: %v", expectedRoom, rooms[0])
+//}
+
 func TestCloudbeds_GetRooms(t *testing.T) {
 
-	// Define the JSON response
-	responseJSON := `{
-		"success": true,
-		"data": [
-			{
-				"propertyID": "297652",
-				"rooms": [
-					{
-						"roomID": "544559-0",
-						"roomName": "DQ(1)",
-						"roomDescription": "",
-						"maxGuests": 2,
-						"isPrivate": true,
-						"roomBlocked": false,
-						"roomTypeID": 544559,
-						"roomTypeName": "Deluxe Queen",
-						"roomTypeNameShort": "DQ"
-					}
-				]
+	//expected error for Bad JSON Format
+	typeValue := reflect.TypeOf(true) // Type of boolean since 'success' is expected to be a bool
+
+	expectedUnmarshalTypeError := &json.UnmarshalTypeError{
+		Value:  "string",           // The incorrect value that we tried to unmarshal
+		Type:   typeValue,          // The expected type
+		Offset: 23,                 // Byte offset in input where error occurs
+		Struct: "ResponseGetRooms", // Struct that has the problematic field
+		Field:  "success",          // The problematic field
+	}
+
+	// expected hotel.DetailedError
+	expectedError := &hotel.DetailedError{
+		Msg: expectedUnmarshalTypeError,
+		Details: fmt.Sprintf("success, but parse return body: %s",
+			errors.New("json: cannot unmarshal string into Go struct field ResponseGetRooms.success of type bool")),
+	}
+
+	generalMockUrl := "https://hotels.cloudbeds.com/api/v1.1/getRooms"
+
+	testCases := []struct {
+		desc             string
+		mockResp         string
+		mockStatus       int
+		mockError        error
+		mockUrl          string
+		expectedResponse []hotel.Room
+		expectedError    error
+		expectError      bool
+	}{
+		{
+			desc: "Successful Response",
+			mockResp: `{
+				"success": true,
+				"data": [{"propertyID": "297652", "rooms": [{"roomID": "544559-0"}]}]
+			}`,
+			mockStatus: http.StatusOK,
+			mockError:  nil,
+			mockUrl:    generalMockUrl,
+			expectedResponse: []hotel.Room{
+				{
+					RoomID: "544559-0",
+				},
+			},
+			expectedError: nil,
+			expectError:   false,
+		},
+		{
+			desc: "Failed Response",
+			mockResp: `{
+				"success": false,
+				"message": "Something went wrong"
+			}`,
+			mockStatus:       http.StatusOK,
+			mockError:        nil,
+			mockUrl:          generalMockUrl,
+			expectedResponse: []hotel.Room{},
+			expectedError:    errors.New("refresh token error"),
+			expectError:      true,
+		},
+		{
+			desc: "Bad JSON Format",
+			mockResp: `{
+				"success": "true",
+				"data": "bad_data"
+			}`,
+			mockStatus: http.StatusOK,
+			mockError:  nil,
+			mockUrl:    generalMockUrl,
+			expectedResponse: []hotel.Room{
+				{
+					RoomID: "544559-0",
+				},
+			},
+			expectedError: expectedError,
+			expectError:   true,
+		},
+		{
+			desc: "Not found API URL",
+			mockResp: `{
+				"success": "true",
+				"data": "bad_data"
+			}`,
+			mockStatus: http.StatusNotFound,
+			mockError:  errors.New("Not found"),
+			mockUrl:    "https://some_garbage",
+			expectedResponse: []hotel.Room{
+				{
+					RoomID: "544559-0",
+				},
+			},
+			expectedError: errors.New("request failed with: Not found"),
+			expectError:   true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			mockClient := new(MockHTTPClient)
+			mockRefresher := new(MockTokenRefresher)
+			mockRefresher.On("refreshToken").Return("", nil)
+			cb := &Cloudbeds{
+				httpClient:     mockClient,
+				log:            logrus.New(),
+				apiUrlGetRooms: tc.mockUrl,
+				refresher:      mockRefresher,
 			}
-		],
-		"count": 1,
-		"total": 1
-	}`
 
-	// Create a mock http.Response
-	resp := &http.Response{
-		StatusCode: 200,
-		Body:       io.NopCloser(bytes.NewBufferString(responseJSON)),
+			resp := &http.Response{
+				StatusCode: tc.mockStatus,
+				Body:       io.NopCloser(bytes.NewBufferString(tc.mockResp)),
+			}
+			mockClient.On("Get", cb.apiUrlGetRooms).Return(resp, tc.mockError)
+
+			testResult, err := cb.GetRooms()
+
+			if tc.expectError {
+				assert.NotNil(t, err, "Expected error but got none")
+				assert.Equal(t, tc.expectedError, err)
+			} else {
+				assert.Nil(t, err, "Expected no error but got one")
+				assert.Equal(t, tc.expectedResponse, testResult)
+			}
+
+			mockClient.AssertExpectations(t)
+		})
 	}
 
-	// Create a mock HTTPClient
-	mockClient := new(MockHTTPClient)
-	mockClient.On("Get", "https://hotels.cloudbeds.com/api/v1.1/getRooms").Return(resp, nil)
-
-	// Create a Cloudbeds instance with the mock HTTPClient
-	cb := &Cloudbeds{
-		httpClient: mockClient,
-		log:        logrus.New(),
-	}
-
-	// Call GetRooms
-	rooms, err := cb.GetRooms()
-
-	// Assert no error occurred
-	assert.Nil(t, err)
-
-	// Assert the Get function was called exactly once with the expected URL
-	mockClient.AssertCalled(t, "Get", "https://hotels.cloudbeds.com/api/v1.1/getRooms")
-
-	// Test that the response was correctly parsed
-	expectedRoom := hotel.Room{
-		RoomID:            "544559-0",
-		RoomName:          "DQ(1)",
-		RoomDescription:   "",
-		MaxGuests:         2,
-		IsPrivate:         true,
-		RoomBlocked:       false,
-		RoomTypeID:        544559,
-		RoomTypeName:      "Deluxe Queen",
-		RoomTypeNameShort: "DQ",
-		PhoneNumber:       "",
-		RoomCondition:     "",
-		RoomOccupied:      false,
-	}
-
-	assert.Equal(t, expectedRoom, rooms[0], "Expected room: %v, got: %v", expectedRoom, rooms[0])
 }
 
-func TestRoom_SearchRoomIDByPhoneNumber(t *testing.T) {
+func TestCloudbeds_Room_SearchRoomIDByPhoneNumber(t *testing.T) {
 
 	log := logrus.New()
 
@@ -465,7 +599,7 @@ func TestCloudbeds_postHousekeepingStatus(t *testing.T) {
 
 }
 
-func TestUpdateRoom(t *testing.T) {
+func TestCloudbeds_UpdateRoom(t *testing.T) {
 	// Create a mock HTTP server
 	postURL := "/api/v1.1/updateRoomCondition"
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -638,7 +772,7 @@ func TestCloudbeds_setOauth2Config(t *testing.T) {
 	}
 }
 
-func TestGetRoom(t *testing.T) {
+func TestCloudbeds_GetRoom(t *testing.T) {
 	tests := []struct {
 		name           string
 		roomNumber     string
@@ -708,7 +842,7 @@ func TestGetRoom(t *testing.T) {
 	}
 }
 
-func TestGenerateRandomString(t *testing.T) {
+func TestCloudbeds_GenerateRandomString(t *testing.T) {
 	tests := []struct {
 		name        string
 		length      int
@@ -787,7 +921,7 @@ func (m *MockSecretStore) Close() error {
 
 // Implement other methods if necessary
 
-func TestGetVarFromStoreOrEnvironment(t *testing.T) {
+func TestCloudbeds_GetVarFromStoreOrEnvironment(t *testing.T) {
 	tests := []struct {
 		name           string
 		storeValue     string
@@ -843,7 +977,7 @@ func TestGetVarFromStoreOrEnvironment(t *testing.T) {
 	}
 }
 
-func TestLoadApiConfiguration(t *testing.T) {
+func TestCloudbeds_LoadApiConfiguration(t *testing.T) {
 
 	// Create testdata directory if it does not exist
 	if _, err := os.Stat("testdata"); os.IsNotExist(err) {
