@@ -1,19 +1,18 @@
 package boltstore
 
-import bolt "go.etcd.io/bbolt"
-
-const (
-	dbFile     = "secrets.db"
-	bucketName = "cloudbeds_creds"
+import (
+	"errors"
+	bolt "go.etcd.io/bbolt"
 )
 
 type BoltDBStore struct {
-	Db *bolt.DB
+	Db         *bolt.DB
+	BucketName string
 }
 
 func (s *BoltDBStore) StoreAccessToken(token string) error {
-	return s.Db.Update(func(tx *bolt.Tx) error {
-		bucket, err := tx.CreateBucketIfNotExists([]byte(bucketName))
+	res := s.Db.Update(func(tx *bolt.Tx) error {
+		bucket, err := tx.CreateBucketIfNotExists([]byte(s.BucketName))
 		if err != nil {
 			return err
 		}
@@ -25,11 +24,12 @@ func (s *BoltDBStore) StoreAccessToken(token string) error {
 
 		return nil
 	})
+	return res
 }
 
 func (s *BoltDBStore) StoreRefreshToken(token string) error {
 	return s.Db.Update(func(tx *bolt.Tx) error {
-		bucket, err := tx.CreateBucketIfNotExists([]byte(bucketName))
+		bucket, err := tx.CreateBucketIfNotExists([]byte(s.BucketName))
 		if err != nil {
 			return err
 		}
@@ -46,15 +46,12 @@ func (s *BoltDBStore) StoreRefreshToken(token string) error {
 func (s *BoltDBStore) RetrieveAccessToken() (string, error) {
 	var token string
 	err := s.Db.View(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket([]byte(bucketName))
+		bucket := tx.Bucket([]byte(s.BucketName))
 		if bucket == nil {
-			return nil
+			return errors.New("bucket is nil")
 		}
 
 		tokenBytes := bucket.Get([]byte("access_token"))
-		if tokenBytes == nil {
-			return nil
-		}
 
 		token = string(tokenBytes)
 		return nil
@@ -70,9 +67,9 @@ func (s *BoltDBStore) RetrieveAccessToken() (string, error) {
 func (s *BoltDBStore) RetrieveRefreshToken() (string, error) {
 	var token string
 	err := s.Db.View(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket([]byte(bucketName))
+		bucket := tx.Bucket([]byte(s.BucketName))
 		if bucket == nil {
-			return nil
+			return errors.New("bucket is nil")
 		}
 
 		tokenBytes := bucket.Get([]byte("refresh_token"))
@@ -93,6 +90,7 @@ func (s *BoltDBStore) RetrieveRefreshToken() (string, error) {
 
 func (s *BoltDBStore) StoreOauthState(state string) error {
 	return s.Db.Update(func(tx *bolt.Tx) error {
+		// we need custom bucket "state" here to effectively delete if after the state is retrieved
 		bucket, err := tx.CreateBucketIfNotExists([]byte(state))
 		if err != nil {
 			return err
@@ -112,7 +110,7 @@ func (s *BoltDBStore) RetrieveOauthState(state string) (string, error) {
 	err := s.Db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(state))
 		if bucket == nil {
-			return nil
+			return errors.New("bucket is nil")
 		}
 
 		tokenBytes := bucket.Get([]byte(state))
@@ -146,9 +144,9 @@ func (s *BoltDBStore) RetrieveOauthState(state string) (string, error) {
 
 func (s *BoltDBStore) RetrieveVar(varName string) (varValue string, err error) {
 	err = s.Db.View(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket([]byte(bucketName))
+		bucket := tx.Bucket([]byte(s.BucketName))
 		if bucket == nil {
-			return nil
+			return errors.New("bucket is nil")
 		}
 
 		varValueBytes := bucket.Get([]byte(varName))
@@ -167,12 +165,15 @@ func (s *BoltDBStore) RetrieveVar(varName string) (varValue string, err error) {
 	return varValue, nil
 }
 
-func Initialize() (*BoltDBStore, error) {
-	dbref, err := bolt.Open(dbFile, 0600, nil)
+func Initialize(dbFileName, bucket_name string) (*BoltDBStore, error) {
+	dbref, err := bolt.Open(dbFileName, 0600, nil)
 	if err != nil {
 		return nil, err
 	}
-	return &BoltDBStore{Db: dbref}, nil
+	return &BoltDBStore{
+		Db:         dbref,
+		BucketName: bucket_name,
+	}, nil
 }
 
 func (s *BoltDBStore) Close() error {
