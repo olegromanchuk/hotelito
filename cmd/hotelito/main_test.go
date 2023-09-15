@@ -3,7 +3,9 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -47,7 +49,9 @@ STANDALONE_VERSION_BOLT_DB_BUCKET_NAME=cloudbeds_creds`
 
 	//test that environmental vars are loaded into memory
 	t.Run("check that file .env is properly loaded into memory", func(t *testing.T) {
-		readAuthVarsFromFile(envTestFileName)
+		logger := logrus.New()
+		logger.SetOutput(io.Discard)
+		readAuthVarsFromFile(envTestFileName, logger)
 	})
 
 	// Read the file line by line

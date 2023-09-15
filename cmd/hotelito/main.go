@@ -26,11 +26,11 @@ func loggingMiddleware(next http.Handler) http.Handler {
 
 func main() {
 
-	//load .env variables into environment
-	readAuthVarsFromFile(".env")
-
 	//define logger
 	log := logrus.New()
+
+	//load .env variables into environment
+	readAuthVarsFromFile(".env", log)
 
 	// The default level is debug.
 	logLevelEnv := os.Getenv("LOG_LEVEL")
@@ -115,7 +115,8 @@ func main() {
 	log.Fatal(http.ListenAndServe(port, nil))
 }
 
-func readAuthVarsFromFile(fileName string) {
+func readAuthVarsFromFile(fileName string, log *logrus.Logger) {
+	log.Warnf("Loading .env file: %s", fileName)
 	err := godotenv.Load(fileName)
 	if err != nil {
 		log.Fatalf("Error loading .env file")
