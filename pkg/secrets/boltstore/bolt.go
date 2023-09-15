@@ -1,7 +1,6 @@
 package boltstore
 
 import (
-	"errors"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -48,10 +47,13 @@ func (s *BoltDBStore) RetrieveAccessToken() (string, error) {
 	err := s.Db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(s.BucketName))
 		if bucket == nil {
-			return errors.New("bucket is nil")
+			return nil //do not return error here!!! This is a valid case when refresh token is not set
 		}
 
 		tokenBytes := bucket.Get([]byte("access_token"))
+		if tokenBytes == nil {
+			return nil
+		}
 
 		token = string(tokenBytes)
 		return nil
@@ -69,7 +71,7 @@ func (s *BoltDBStore) RetrieveRefreshToken() (string, error) {
 	err := s.Db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(s.BucketName))
 		if bucket == nil {
-			return errors.New("bucket is nil")
+			return nil //do not return error here!!! This is a valid case when refresh token is not set
 		}
 
 		tokenBytes := bucket.Get([]byte("refresh_token"))
@@ -110,7 +112,7 @@ func (s *BoltDBStore) RetrieveOauthState(state string) (string, error) {
 	err := s.Db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(state))
 		if bucket == nil {
-			return errors.New("bucket is nil")
+			return nil //do not return error here!!! This is a valid case when refresh token is not set
 		}
 
 		tokenBytes := bucket.Get([]byte(state))
@@ -146,7 +148,7 @@ func (s *BoltDBStore) RetrieveVar(varName string) (varValue string, err error) {
 	err = s.Db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(s.BucketName))
 		if bucket == nil {
-			return errors.New("bucket is nil")
+			return nil //do not return error here!!q! This is a valid case when refresh token is not set
 		}
 
 		varValueBytes := bucket.Get([]byte(varName))

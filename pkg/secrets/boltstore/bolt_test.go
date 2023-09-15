@@ -67,7 +67,7 @@ func TestRetrieveAccessToken(t *testing.T) {
 		expectErr   bool
 	}{
 		{"Valid Token", "test_access_token", "test_bucket", "test_access_token", false},
-		{"Empty bucket name", "test_access_token", "", "", true},
+		{"Empty bucket name", "test_access_token", "", "", false},
 		{"Empty token", "", "test_bucket", "", false},
 	}
 
@@ -131,7 +131,7 @@ func TestRetrieveRefreshToken(t *testing.T) {
 		expectErr   bool
 	}{
 		{"Valid Token", "test_access_token", "test_bucket", "test_access_token", false},
-		{"Empty bucket name", "test_access_token", "", "", true},
+		{"Empty bucket name", "test_access_token", "", "", false},
 		{"Empty token", "", "test_bucket", "", false},
 	}
 
@@ -225,7 +225,7 @@ func TestRetrieveVar(t *testing.T) {
 		expectErr   bool
 	}{
 		{"Valid value", "var_name_A", "var_value_A", "test_bucket", "var_value_A", false},
-		{"Empty  bucket", "var_name_A", "var_value_A", "", "", true},
+		{"Empty  bucket", "var_name_A", "var_value_A", "", "", false},
 		{"Empty  name", "", "", "test_bucket", "", false},
 		{"Empty  value", "var_name_A", "", "test_bucket", "", false},
 	}
