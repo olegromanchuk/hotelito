@@ -229,6 +229,9 @@ To add new function follow the next steps:
 3. add new section in sync_environmental_vars.sh. Search for the section called "All functions must be added here"
 
 
+### Testing
+Generate mock file for advanced testing:`mockgen -source=aws.go -destination=mock_awsstore.go -package=awsstore`
+
 ## TODO
 [x] makefile  
 [x] workflows  
