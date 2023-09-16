@@ -163,6 +163,7 @@ func (m *MockTokenRefresher) refreshToken() error {
 }
 
 type MockOauthConfInterface struct {
+	OauthConfInterface
 	mock.Mock
 }
 
@@ -178,7 +179,7 @@ func (m *MockOauthConfInterface) Exchange(ctx context.Context, code string, opts
 
 func (m *MockOauthConfInterface) TokenSource(ctx context.Context, t *oauth2.Token) oauth2.TokenSource {
 	args := m.Called(ctx, t)
-	return args.Get(0).(oauth2.TokenSource)
+	return args.Get(0).(oauth2.TokenSource) // Note the type assertion to oauth2.TokenSource
 }
 
 func (m *MockOauthConfInterface) Client(ctx context.Context, t *oauth2.Token) *http.Client {
@@ -1296,6 +1297,79 @@ func TestLogin(t *testing.T) {
 			assert.Equal(t, tt.expectedStatusCodeMsg, statusCodeMsg)
 			assert.Equal(t, tt.expectedMsg, msg)
 
+		})
+	}
+}
+
+func TestCloudbeds_RefreshToken(t *testing.T) {
+	tests := []struct {
+		name              string
+		expectedError     error
+		setOauth2Config   error
+		refreshTokenErr   error
+		newTokenErr       error
+		retrieveVarString string
+		storeAccessToken  error
+	}{
+		//do not test success. Too complex to mock
+		{
+			name:              "setOauth2Config error",
+			setOauth2Config:   errors.New("someError"),
+			expectedError:     errors.New("Not all required env variables are set. Missed one of: CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET, CLOUDBEDS_REDIRECT_URL, CLOUDBEDS_SCOPES, CLOUDBEDS_AUTH_URL, CLOUDBEDS_TOKEN_URL"),
+			refreshTokenErr:   nil,
+			retrieveVarString: "",
+		},
+		{
+			name:              "RetrieveRefreshToken error",
+			setOauth2Config:   nil,
+			expectedError:     errors.New("failed to retrieve refresh token from secret store: someError"),
+			refreshTokenErr:   errors.New("someError"),
+			retrieveVarString: "some_value",
+		},
+		{
+			name:              "failed protocol schema",
+			setOauth2Config:   nil,
+			expectedError:     errors.New("failed to get new access token. Looks like refresh token is stale. Clearing it and try to login again. Error: Post \"some_value\": unsupported protocol scheme \"\""),
+			refreshTokenErr:   nil,
+			retrieveVarString: "some_value",
+		},
+		{
+			name:              "host lookup failed",
+			setOauth2Config:   nil,
+			expectedError:     errors.New("failed to get new access token. Looks like refresh token is stale. Clearing it and try to login again. Error: Post"),
+			refreshTokenErr:   nil,
+			retrieveVarString: "https://some_value",
+		},
+		{
+			name:              "host available, but oauth2 returns error",
+			setOauth2Config:   nil,
+			expectedError:     errors.New("failed to get new access token. Looks like refresh token is stale. Clearing it and try to login again. Error: oauth2"),
+			refreshTokenErr:   nil,
+			retrieveVarString: "https://google.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger := logrus.New()
+			logger.SetOutput(io.Discard)
+			mockStoreClient := new(MockSecretsStore)
+			mockOauthConf := new(MockOauthConfInterface)
+			p := &Cloudbeds{
+				log:         logger,
+				storeClient: mockStoreClient,
+				oauthConf:   mockOauthConf,
+			}
+
+			mockStoreClient.On("RetrieveRefreshToken").Return("someRefreshToken", tt.refreshTokenErr)
+			mockOauthConf.On("TokenSource", mock.Anything, mock.Anything).Return(mock.Anything)
+			mockOauthConf.On("Client", mock.Anything, mock.Anything).Return(&http.Client{})
+			mockStoreClient.On("StoreAccessToken", mock.Anything).Return(tt.storeAccessToken)
+			mockStoreClient.On("RetrieveVar", mock.Anything).Return(tt.retrieveVarString, nil)
+
+			err := p.refreshToken()
+
+			assert.Contains(t, err.Error(), tt.expectedError.Error())
 		})
 	}
 }

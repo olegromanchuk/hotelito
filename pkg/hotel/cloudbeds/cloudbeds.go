@@ -329,6 +329,7 @@ func (p *Cloudbeds) login(secretStore secrets.SecretsStore) (statusCodeMsg strin
 	return "ok", "", nil
 }
 
+// refreshToken helper function to refresh token and store new access token to secret store
 func (p *Cloudbeds) refreshToken() error {
 	p.log.Debugf("Trying to refresh token")
 
@@ -340,7 +341,9 @@ func (p *Cloudbeds) refreshToken() error {
 
 	refreshToken, err := p.storeClient.RetrieveRefreshToken()
 	if err != nil {
-		p.log.Fatalf("failed to retrieve refresh token from secret store: %v", err)
+		errMsg := fmt.Sprintf("failed to retrieve refresh token from secret store: %v", err)
+		p.log.Error(errMsg)
+		return errors.New(errMsg)
 	}
 
 	// Make client request using the obtained token
@@ -351,7 +354,15 @@ func (p *Cloudbeds) refreshToken() error {
 	tokenSource := p.oauthConf.TokenSource(context.Background(), token)
 	newToken, err := tokenSource.Token()
 	if err != nil {
-		p.log.Info("failed to get new access token. Looks like refresh token is stale. Clearing it and try to login again")
+		errMsg := fmt.Sprintf("failed to get new access token. Looks like refresh token is stale. Clearing it and try to login again. Error: %v", err.Error())
+		p.log.Error(errMsg)
+		return errors.New(errMsg)
+	}
+
+	if newToken == nil {
+		errMsg := "failed to get new access token. Looks like refresh token is stale. Clearing it and try to login again"
+		p.log.Error(errMsg)
+		return errors.New(errMsg)
 	}
 
 	p.httpClient = p.oauthConf.Client(context.Background(), token)
