@@ -18,28 +18,10 @@ import (
 )
 
 func HandleLookupByNumber(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	fmt.Println(request)
+
 	//define logger
-	log := logrus.New()
-	// The default level is debug.
-	logLevelEnv := os.Getenv("LOG_LEVEL")
-	if logLevelEnv == "" {
-		logLevelEnv = "debug"
-	}
-	logLevel, err := logrus.ParseLevel(logLevelEnv)
-	if err != nil {
-		logLevel = logrus.DebugLevel
-	}
-
-	//custom formatter will add caller name to the logging
-	traceID := logging.GenerateTraceID()
-	if logLevel >= 5 { //Debug or Trace level
-		log.Formatter = &logging.CustomFormatter{CustomFormatter: &logrus.TextFormatter{}, TraceID: traceID}
-	}
-
-	log.SetLevel(logLevel)
-	log.SetOutput(os.Stdout)
-	log.Infof("Log level: %s", logLevelEnv)
+	log := initializeLog()
+	log.Debugf("%v", request)
 
 	//get APP_NAME from env
 	appName := os.Getenv("APPLICATION_NAME")
@@ -67,7 +49,10 @@ func HandleLookupByNumber(ctx context.Context, request events.APIGatewayProxyReq
 	//current secret store - aws env variables
 	storeClient, err := awsstore.Initialize(log, storePrefix, awsRegion)
 	if err != nil {
-		log.Fatal(err)
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       fmt.Sprintf("Error: %v", err),
+		}, nil
 	}
 
 	configMap := &configuration.ConfigMap{} //we do not use configuration in this lambda. Empty struct is ok
@@ -90,7 +75,7 @@ func HandleLookupByNumber(ctx context.Context, request events.APIGatewayProxyReq
 	pbx3cxClient := pbx3cx.New(log, configMap)
 	//define handlers
 	h := handlers.NewHandler(log, pbx3cxClient, clbClient)
-	jsonAsBytes, err := h.PBX.ProcessLookupByNumber(number)  //returns dummy contact with "number"
+	jsonAsBytes, err := h.PBX.ProcessLookupByNumber(number) //returns dummy contact with "number"
 	if err != nil {
 		log.Error(err)
 		return events.APIGatewayProxyResponse{
@@ -107,4 +92,28 @@ func HandleLookupByNumber(ctx context.Context, request events.APIGatewayProxyReq
 
 func main() {
 	lambda.Start(HandleLookupByNumber)
+}
+
+func initializeLog() *logrus.Logger {
+	log := logrus.New()
+	// The default level is debug.
+	logLevelEnv := os.Getenv("LOG_LEVEL")
+	if logLevelEnv == "" {
+		logLevelEnv = "debug"
+	}
+	logLevel, err := logrus.ParseLevel(logLevelEnv)
+	if err != nil {
+		logLevel = logrus.DebugLevel
+	}
+
+	//custom formatter will add caller name to the logging
+	traceID := logging.GenerateTraceID()
+	if logLevel >= 5 { //Debug or Trace level
+		log.Formatter = &logging.CustomFormatter{CustomFormatter: &logrus.TextFormatter{}, TraceID: traceID}
+	}
+
+	log.SetLevel(logLevel)
+	log.SetOutput(os.Stdout)
+	log.Infof("Log level: %s", logLevelEnv)
+	return log
 }
