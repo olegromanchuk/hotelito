@@ -10,6 +10,7 @@ import (
 	"github.com/olegromanchuk/hotelito/pkg/pbx/pbx3cx"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -17,17 +18,23 @@ import (
 	"testing"
 )
 
-type MockPBXProvider struct{}
+type MockPBXProvider struct {
+	mock.Mock
+}
 
 func (m *MockPBXProvider) ProcessPBXRequest(jsonDecoder *json.Decoder) (pbx.Room, error) {
-	return pbx.Room{}, nil
+	args := m.Called(jsonDecoder)
+	return args.Get(0).(pbx.Room), args.Error(1)
 }
 
-func (m *MockPBXProvider) ProcessLookupByNumber(number string) (bodyAsBytes []byte, err error) {
-	return []byte{}, nil
+func (m *MockPBXProvider) ProcessLookupByNumber(number string) ([]byte, error) {
+	args := m.Called(number)
+	return args.Get(0).([]byte), args.Error(1)
 }
 
-type MockHospitalityProvider struct{}
+type MockHospitalityProvider struct {
+	mock.Mock
+}
 
 func (m *MockHospitalityProvider) GetRooms() ([]hotel.Room, error) {
 	return []hotel.Room{}, nil
@@ -222,4 +229,20 @@ func TestHandler_Handle3cxCallInfo(t *testing.T) {
 			assert.Equal(t, tt.expectedBody, tt.args.w.(*httptest.ResponseRecorder).Body.String())
 		})
 	}
+}
+
+func TestNewHandler(t *testing.T) {
+	mockLog := logrus.New()
+	mockPBX := new(MockPBXProvider)
+	mockHotel := new(MockHospitalityProvider)
+
+	handler := NewHandler(mockLog, mockPBX, mockHotel)
+
+	assert.NotNil(t, handler)
+	assert.IsType(t, &Handler{}, handler)
+
+	// Validate that the dependencies are correctly injected
+	assert.Equal(t, mockLog, handler.Log)
+	assert.Equal(t, mockPBX, handler.PBX)
+	assert.Equal(t, mockHotel, handler.Hotel)
 }
