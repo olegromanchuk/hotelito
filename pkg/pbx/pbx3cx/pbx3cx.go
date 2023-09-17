@@ -114,6 +114,10 @@ func (pbx3cx *PBX3CX) processOutboundCall(requestBody RequestBody) (room pbx.Roo
 // We need it to satisfy 3cx API request for number lookup. 3cx sends API request and expects json with contact information
 // if no lookup information is provided back, the next request will not be sent. So, we just take incoming number and generate a dummy contact to satisfy 3cx.
 func (pbx3cx *PBX3CX) ProcessLookupByNumber(number string) (bodyAsBytes []byte, err error) {
+	return ProcessLookupByNumber(number)
+}
+
+func ProcessLookupByNumber(number string) (bodyAsBytes []byte, err error) {
 	contact := Contact{
 		ID:          12345,
 		FirstName:   "dummyFirstName",

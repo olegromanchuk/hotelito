@@ -521,3 +521,17 @@ func TestInitialize(t *testing.T) {
 		})
 	}
 }
+
+func TestCloseAWSSecretsStore(t *testing.T) {
+	// Arrange
+	awsSecretsStore := &AWSSecretsStore{
+		AWSSession: &session.Session{}, // not nil
+	}
+
+	// Act
+	err := awsSecretsStore.Close()
+
+	// Assert
+	assert.Nil(t, err)
+	assert.Nil(t, awsSecretsStore.AWSSession)
+}

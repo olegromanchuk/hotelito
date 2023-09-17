@@ -3,12 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/olegromanchuk/hotelito/internal/configuration"
-	"github.com/olegromanchuk/hotelito/internal/handlers"
 	"github.com/olegromanchuk/hotelito/internal/logging"
-	"github.com/olegromanchuk/hotelito/pkg/hotel/cloudbeds"
 	"github.com/olegromanchuk/hotelito/pkg/pbx/pbx3cx"
-	"github.com/olegromanchuk/hotelito/pkg/secrets/awsstore"
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"os"
@@ -45,37 +41,11 @@ func HandleLookupByNumber(ctx context.Context, request events.APIGatewayProxyReq
 	}
 	log.Debugf("AWS_REGION: %s", awsRegion)
 
-	storePrefix := fmt.Sprintf("%s/%s", appName, environmentType) //hotelito-app-production
-	//current secret store - aws env variables
-	storeClient, err := awsstore.Initialize(log, storePrefix, awsRegion)
-	if err != nil {
-		return events.APIGatewayProxyResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       fmt.Sprintf("Error: %v", err),
-		}, nil
-	}
-
-	configMap := &configuration.ConfigMap{} //we do not use configuration in this lambda. Empty struct is ok
-	//create cloudbeds client
-	clbClient, err := cloudbeds.New(log, storeClient, configMap)
-	if err != nil {
-		log.Errorf("Error creating cloudbeds client: %v", err)
-		return events.APIGatewayProxyResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       fmt.Sprintf("Error: %v", err),
-		}, nil
-	}
-
 	// exctract state and code from request
 	log.Debugf("Handling lookup by number request: %v", request)
 	number := request.QueryStringParameters["Number"]
 
-	//option via handler interface. Helpful for testing
-	//create 3cx client
-	pbx3cxClient := pbx3cx.New(log, configMap)
-	//define handlers
-	h := handlers.NewHandler(log, pbx3cxClient, clbClient)
-	jsonAsBytes, err := h.PBX.ProcessLookupByNumber(number) //returns dummy contact with "number"
+	jsonAsBytes, err := pbx3cx.ProcessLookupByNumber(number) //returns dummy contact with "number"
 	if err != nil {
 		log.Error(err)
 		return events.APIGatewayProxyResponse{
