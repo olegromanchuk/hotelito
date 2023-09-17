@@ -418,7 +418,7 @@ func (p *Cloudbeds) HandleOAuthCallback(state, code string) (err error) {
 func New(log *logrus.Logger, secretStore secrets.SecretsStore, configMapInfo *configuration.ConfigMap) (*Cloudbeds, error) {
 	log.Debugf("Creating new Cloudbeds client")
 
-	apiConfigurationFileName := "cloudbeds_api_params.json"
+	apiConfigurationFileName := configMapInfo.ApiCfgFileName
 	apiConfiguration, err := loadApiConfiguration(log, apiConfigurationFileName)
 	if err != nil {
 		log.Error(err)
@@ -472,8 +472,9 @@ func loadApiConfiguration(log *logrus.Logger, apiConfigurationFileName string) (
 	apiConfiguration = &ApiConfiguration3CX{}
 	file, err := os.Open(apiConfigurationFileName)
 	if err != nil {
-		errMsg := fmt.Errorf("error opening config file: %s", err.Error())
-		log.Errorf(errMsg.Error())
+		errMsg := fmt.Sprintf("error opening config file: %s", err.Error())
+		log.Errorf(errMsg)
+		return apiConfiguration, errors.New(errMsg)
 	}
 	defer file.Close()
 	byteValue, _ := io.ReadAll(file)
@@ -506,7 +507,9 @@ func NewClient4CallbackAndInit(log *logrus.Logger, secretStore secrets.SecretsSt
 func (p *Cloudbeds) Close() error {
 	err := p.storeClient.Close()
 	if err != nil {
-		p.log.Error(err)
+		errMsg := fmt.Sprintf("failed to close secret store: %s", err.Error())
+		p.log.Error(errMsg)
+		return errors.New(errMsg)
 	}
 	return nil
 }
