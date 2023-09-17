@@ -11,16 +11,13 @@ import (
 	"testing"
 )
 
-func Test_readAuthVarsFromFile(t *testing.T) {
-
-	envTestFileName := ".env_test"
+func createEnvFile(envTestFileName string) (file *os.File) {
 	//create .env file for testing
 	file, err := os.Create(envTestFileName)
 	if err != nil {
 		fmt.Printf("Error creating file %v:. Error: %v", envTestFileName, err)
-		return
+		panic(err)
 	}
-	defer file.Close()
 
 	envContent := `ENVIRONMENT=production
 APPLICATION_NAME=hotelito-app
@@ -42,10 +39,18 @@ STANDALONE_VERSION_BOLT_DB_BUCKET_NAME=cloudbeds_creds`
 	_, err = file.WriteString(envContent)
 	if err != nil {
 		fmt.Println("Error writing to file:", err)
-		return
+		panic(err)
 	}
 
 	fmt.Println(".env file has been created.")
+	return file
+}
+
+func Test_readAuthVarsFromFile(t *testing.T) {
+	envTestFileName := ".env_test"
+	file := createEnvFile(envTestFileName)
+	defer os.Remove(envTestFileName)
+	defer file.Close()
 
 	//test that environmental vars are loaded into memory
 	t.Run("check that file .env is properly loaded into memory", func(t *testing.T) {
@@ -66,7 +71,6 @@ STANDALONE_VERSION_BOLT_DB_BUCKET_NAME=cloudbeds_creds`
 			t.Errorf("For env variable %s, expected %s but got %s", key, expectedValue, actualValue)
 		}
 	}
-	os.Remove(envTestFileName)
 }
 
 func TestInitializeStore(t *testing.T) {

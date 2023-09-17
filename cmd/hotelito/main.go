@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
@@ -15,6 +17,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 )
 
 func loggingMiddleware(next http.Handler) http.Handler {
@@ -25,12 +28,23 @@ func loggingMiddleware(next http.Handler) http.Handler {
 }
 
 func main() {
+	// Define the flag
+	configFileName := flag.String("config", ".env", "Path to the config file")
+
+	// Parse the flags
+	flag.Parse()
+
+	quit := make(chan struct{})
+	runServer(*configFileName, quit)
+}
+
+func runServer(envFileName string, quit chan struct{}) {
 
 	//define logger
 	log := logrus.New()
 
 	//load .env variables into environment
-	readAuthVarsFromFile(".env", log)
+	readAuthVarsFromFile(envFileName, log)
 
 	// The default level is debug.
 	logLevelEnv := os.Getenv("LOG_LEVEL")
@@ -112,7 +126,25 @@ func main() {
 		log.Warn("PORT env variable is not set. Using default port 8080")
 		port = ":8080"
 	}
-	log.Fatal(http.ListenAndServe(port, nil))
+
+	server := &http.Server{Addr: port}
+
+	go func() {
+		fmt.Printf("Starting server on port %s", port)
+		if err := server.ListenAndServe(); err != http.ErrServerClosed {
+			log.Fatalf("Server failed: %v", err)
+		}
+	}()
+
+	<-quit
+
+	// Shutdown the server
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		log.Fatalf("Server Shutdown Failed:%+v", err)
+	}
 }
 
 func readAuthVarsFromFile(fileName string, log *logrus.Logger) {
