@@ -1,5 +1,6 @@
 ENVIRONMENT=production
 APPLICATION_NAME=hotelito-app
+# acceptable values: debug, info, warn, error, fatal, panic, trace
 LOG_LEVEL=debug
 CLOUDBEDS_CLIENT_ID=mycompanyexample_LuPCZsereqdqdXjS
 CLOUDBEDS_CLIENT_SECRET=sadfsadkjHKJujewnfw32SDDFFD
@@ -8,5 +9,9 @@ CLOUDBEDS_SCOPES=read:hotel,read:reservation,write:reservation,read:room,write:r
 CLOUDBEDS_AUTH_URL=https://hotels.cloudbeds.com/api/v1.1/oauth
 CLOUDBEDS_TOKEN_URL=https://hotels.cloudbeds.com/api/v1.1/access_token
 HOSPITALITY_PHONE2ROOM_MAP_FILENAME=config.json
+HOSPITALITY_API_CONF_FILENAME=cloudbeds_api_params.json
 PORT=8080
 AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID=hotelito-app-3cxroomextension-cloudbedsroomid
+AWS_S3_BUCKET_4_CLBEDS_API_CONF=hotelito-app-3cxroomextension-cloudbedsroomid
+STANDALONE_VERSION_BOLT_DB_FILENAME=secrets.db
+STANDALONE_VERSION_BOLT_DB_BUCKET_NAME=cloudbeds_creds

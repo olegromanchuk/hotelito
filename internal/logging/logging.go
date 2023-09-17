@@ -1,13 +1,12 @@
 package logging
 
 import (
+	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"github.com/sirupsen/logrus"
-	"math/rand"
 	"path/filepath"
 	"runtime"
-	"time"
 )
 
 type CustomFormatter struct {
@@ -24,7 +23,6 @@ func (f *CustomFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 func GenerateTraceID() string {
 	length := 6
 	bytes := make([]byte, length)
-	rand.Seed(time.Now().UnixNano())
-	rand.Read(bytes)
+	_, _ = rand.Read(bytes)
 	return hex.EncodeToString(bytes)
 }

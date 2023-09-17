@@ -4,6 +4,7 @@
 **/environmental_vars.json
 dist/
 .idea/
+.vscode/
 **/*private_nogit*
 3cx/crm-template-cloudbeds-3cx.xml
 profile.cov

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"github.com/olegromanchuk/hotelito/internal/configuration"
@@ -24,11 +26,11 @@ func loggingMiddleware(next http.Handler) http.Handler {
 
 func main() {
 
-	//load .env variables into environment
-	readAuthVarsFromFile()
-
 	//define logger
 	log := logrus.New()
+
+	//load .env variables into environment
+	readAuthVarsFromFile(".env", log)
 
 	// The default level is debug.
 	logLevelEnv := os.Getenv("LOG_LEVEL")
@@ -69,7 +71,7 @@ func main() {
 	//   ---------------------- Cloudbed parts ----------------------
 
 	//current secret store - boltDB
-	storeClient, err := boltstore.Initialize()
+	storeClient, err := InitializeStore()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -113,9 +115,37 @@ func main() {
 	log.Fatal(http.ListenAndServe(port, nil))
 }
 
-func readAuthVarsFromFile() {
-	err := godotenv.Load()
+func readAuthVarsFromFile(fileName string, log *logrus.Logger) {
+	log.Warnf("Loading .env file: %s", fileName)
+	err := godotenv.Load(fileName)
 	if err != nil {
 		log.Fatalf("Error loading .env file")
 	}
+}
+
+func InitializeStore() (*boltstore.BoltDBStore, error) {
+
+	//get file name from env
+	dbFileName := os.Getenv("STANDALONE_VERSION_BOLT_DB_FILENAME")
+	if dbFileName == "" {
+		return nil, fmt.Errorf("STANDALONE_VERSION_BOLT_DB_FILENAME env variable is not set")
+	}
+
+	bucketName := os.Getenv("STANDALONE_VERSION_BOLT_DB_BUCKET_NAME")
+	if bucketName == "" {
+		return nil, fmt.Errorf("STANDALONE_VERSION_BOLT_DB_BUCKET_NAME env variable is not set")
+	}
+
+	storeClient, err := boltstore.Initialize(dbFileName, bucketName)
+	if err != nil {
+		errMsg := fmt.Sprintf("error initializing bolt store: %s", err)
+		return nil, errors.New(errMsg)
+	}
+
+	//check returned store object has BucketName is set
+	if storeClient.BucketName == "" {
+		return nil, fmt.Errorf("error durin store initialization. storeClient.BucketName variable is not set")
+	}
+
+	return storeClient, nil
 }

@@ -9,37 +9,40 @@ import (
 	"strings"
 )
 
+type storageManager interface {
+	PutParameter(input *ssm.PutParameterInput) (*ssm.PutParameterOutput, error)
+	GetParameter(input *ssm.GetParameterInput) (*ssm.GetParameterOutput, error)
+	DeleteParameter(input *ssm.DeleteParameterInput) (*ssm.DeleteParameterOutput, error)
+}
+
 type AWSSecretsStore struct {
 	AccessTokenParamName  string
 	RefreshTokenParamName string
 	AWSSession            *session.Session
 	StorePrefix           string
 	Log                   *logrus.Logger
+	SSM                   storageManager
 }
 
 func (s *AWSSecretsStore) StoreAccessToken(token string) error {
-	ssmSvc := ssm.New(s.AWSSession)
-
 	input := &ssm.PutParameterInput{
 		Name:      aws.String(s.AccessTokenParamName),
 		Overwrite: aws.Bool(true),
 		Type:      aws.String("SecureString"),
 		Value:     aws.String(token),
 	}
-
-	_, err := ssmSvc.PutParameter(input)
+	_, err := s.SSM.PutParameter(input)
 	return err
 }
 
 func (s *AWSSecretsStore) RetrieveAccessToken() (string, error) {
-	ssmSvc := ssm.New(s.AWSSession)
 
 	input := &ssm.GetParameterInput{
 		Name:           aws.String(s.AccessTokenParamName),
 		WithDecryption: aws.Bool(true),
 	}
 
-	result, err := ssmSvc.GetParameter(input)
+	result, err := s.SSM.GetParameter(input)
 	if err != nil {
 		return "", err
 	}
@@ -48,7 +51,6 @@ func (s *AWSSecretsStore) RetrieveAccessToken() (string, error) {
 }
 
 func (s *AWSSecretsStore) StoreRefreshToken(token string) error {
-	ssmSvc := ssm.New(s.AWSSession)
 
 	input := &ssm.PutParameterInput{
 		Name:      aws.String(s.RefreshTokenParamName),
@@ -57,19 +59,18 @@ func (s *AWSSecretsStore) StoreRefreshToken(token string) error {
 		Value:     aws.String(token),
 	}
 
-	_, err := ssmSvc.PutParameter(input)
+	_, err := s.SSM.PutParameter(input)
 	return err
 }
 
 func (s *AWSSecretsStore) RetrieveRefreshToken() (string, error) {
-	ssmSvc := ssm.New(s.AWSSession)
 
 	input := &ssm.GetParameterInput{
 		Name:           aws.String(s.RefreshTokenParamName),
 		WithDecryption: aws.Bool(true),
 	}
 
-	result, err := ssmSvc.GetParameter(input)
+	result, err := s.SSM.GetParameter(input)
 	if err != nil {
 		errMsg := err.Error()
 		if errMsg == "ParameterNotFound: " {
@@ -82,7 +83,7 @@ func (s *AWSSecretsStore) RetrieveRefreshToken() (string, error) {
 }
 
 func (s *AWSSecretsStore) StoreOauthState(state string) error {
-	ssmSvc := ssm.New(s.AWSSession)
+
 	s.Log.Debugf("Storing state %s", state)
 	//get full name including app name and environment type
 	fullParamName := fmt.Sprintf("/%s/%s", s.StorePrefix, state)
@@ -94,7 +95,7 @@ func (s *AWSSecretsStore) StoreOauthState(state string) error {
 		Value:     aws.String(state),
 	}
 
-	_, err := ssmSvc.PutParameter(input)
+	_, err := s.SSM.PutParameter(input)
 	if err != nil {
 		s.Log.Errorf("Error storing state %s", err.Error())
 	}
@@ -102,7 +103,6 @@ func (s *AWSSecretsStore) StoreOauthState(state string) error {
 }
 
 func (s *AWSSecretsStore) RetrieveOauthState(state string) (string, error) {
-	ssmSvc := ssm.New(s.AWSSession)
 
 	//get full name including app name and environment type
 	fullParamName := fmt.Sprintf("/%s/%s", s.StorePrefix, state)
@@ -113,7 +113,7 @@ func (s *AWSSecretsStore) RetrieveOauthState(state string) (string, error) {
 		WithDecryption: aws.Bool(false),
 	}
 
-	result, err := ssmSvc.GetParameter(input)
+	result, err := s.SSM.GetParameter(input)
 	if err != nil {
 		return "", err
 	}
@@ -124,8 +124,7 @@ func (s *AWSSecretsStore) RetrieveOauthState(state string) (string, error) {
 	//check if string is quoted and strip if yes
 	if strings.HasPrefix(resultRaw, "\"") {
 		resultString = strings.Trim(resultRaw, "\"")
-		s.Log.Tracef("Retrieved %s", resultRaw)
-		return resultString, nil
+		s.Log.Tracef("Retrieved %s. Transformed to: %s", resultRaw, resultString)
 	}
 
 	//clean up. Delete retrieved state
@@ -134,7 +133,7 @@ func (s *AWSSecretsStore) RetrieveOauthState(state string) (string, error) {
 		Name: aws.String(fullParamName),
 	}
 
-	_, err = ssmSvc.DeleteParameter(delInput)
+	_, err = s.SSM.DeleteParameter(delInput)
 	if err != nil {
 		return "", err
 	}
@@ -143,7 +142,6 @@ func (s *AWSSecretsStore) RetrieveOauthState(state string) (string, error) {
 }
 
 func (s *AWSSecretsStore) RetrieveVar(varName string) (varValue string, err error) {
-	ssmSvc := ssm.New(s.AWSSession)
 
 	//get full name including app name and environment type
 	fullParamName := fmt.Sprintf("/%s/%s", s.StorePrefix, varName)
@@ -153,7 +151,7 @@ func (s *AWSSecretsStore) RetrieveVar(varName string) (varValue string, err erro
 		WithDecryption: aws.Bool(true),
 	}
 
-	result, err := ssmSvc.GetParameter(input)
+	result, err := s.SSM.GetParameter(input)
 	if err != nil {
 		return "", err
 	}
@@ -186,11 +184,15 @@ func Initialize(log *logrus.Logger, storePrefix string, awsRegion string) (*AWSS
 		return nil, err
 	}
 
-	return &AWSSecretsStore{AccessTokenParamName: accessTokenParamName,
+	ssmSvc := ssm.New(sess)
+
+	return &AWSSecretsStore{
+		AccessTokenParamName:  accessTokenParamName,
 		RefreshTokenParamName: refreshTokenParamName,
 		AWSSession:            sess,
 		StorePrefix:           storePrefix,
 		Log:                   log,
+		SSM:                   ssmSvc,
 	}, nil
 }
 

@@ -74,6 +74,7 @@ func (h *Handler) Handle3cxCallInfo(w http.ResponseWriter, r *http.Request) {
 		h.Log.Error(err)
 		return
 	}
+
 	if room.PhoneNumber == "" {
 		h.Log.Error("Room phone number is empty")
 		return

@@ -2,22 +2,111 @@ package cloudbeds
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/golang/mock/gomock"
 	"github.com/olegromanchuk/hotelito/internal/configuration"
 	"github.com/olegromanchuk/hotelito/pkg/hotel"
 	"github.com/olegromanchuk/hotelito/pkg/secrets"
 	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"golang.org/x/oauth2"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"reflect"
 	"testing"
 )
+
+// GoMockHTTPClient is a mock of HTTPClient interface.
+type GoMockHTTPClient struct {
+	ctrl     *gomock.Controller
+	recorder *GoMockHTTPClientGoMockRecorder
+}
+
+// GoMockHTTPClientGoMockRecorder is the mock recorder for GoMockHTTPClient.
+type GoMockHTTPClientGoMockRecorder struct {
+	mock *GoMockHTTPClient
+}
+
+// NewMockHTTPClient creates a new mock instance.
+func NewMockHTTPClient(ctrl *gomock.Controller) *GoMockHTTPClient {
+	mock := &GoMockHTTPClient{ctrl: ctrl}
+	mock.recorder = &GoMockHTTPClientGoMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *GoMockHTTPClient) EXPECT() *GoMockHTTPClientGoMockRecorder {
+	return m.recorder
+}
+
+// Do mocks base method.
+func (m *GoMockHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Do", req)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Do indicates an expected call of Do.
+func (mr *GoMockHTTPClientGoMockRecorder) Do(req interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Do", reflect.TypeOf((*GoMockHTTPClient)(nil).Do), req)
+}
+
+// Get mocks base method.
+func (m *GoMockHTTPClient) Get(url string) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Get", url)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Get indicates an expected call of Get.
+func (mr *GoMockHTTPClientGoMockRecorder) Get(url interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*GoMockHTTPClient)(nil).Get), url)
+}
+
+// GoMockTokenRefresher is a mock of TokenRefresher interface.
+type GoMockTokenRefresher struct {
+	ctrl     *gomock.Controller
+	recorder *GoMockTokenRefresherGoMockRecorder
+}
+
+// GoMockTokenRefresherGoMockRecorder is the mock recorder for GoMockTokenRefresher.
+type GoMockTokenRefresherGoMockRecorder struct {
+	mock *GoMockTokenRefresher
+}
+
+// NewMockTokenRefresher creates a new mock instance.
+func NewMockTokenRefresher(ctrl *gomock.Controller) *GoMockTokenRefresher {
+	mock := &GoMockTokenRefresher{ctrl: ctrl}
+	mock.recorder = &GoMockTokenRefresherGoMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *GoMockTokenRefresher) EXPECT() *GoMockTokenRefresherGoMockRecorder {
+	return m.recorder
+}
+
+// refreshToken mocks base method.
+func (m *GoMockTokenRefresher) refreshToken() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "refreshToken")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
 
 type MockHTTPClient struct {
 	mock.Mock
@@ -73,6 +162,31 @@ func (m *MockSecretsStore) Close() error {
 
 func (m *MockTokenRefresher) refreshToken() error {
 	return fmt.Errorf("refresh token error")
+}
+
+type MockOauthConfInterface struct {
+	OauthConfInterface
+	mock.Mock
+}
+
+func (m *MockOauthConfInterface) AuthCodeURL(state string, opts ...oauth2.AuthCodeOption) string {
+	args := m.Called(state, opts)
+	return args.String(0)
+}
+
+func (m *MockOauthConfInterface) Exchange(ctx context.Context, code string, opts ...oauth2.AuthCodeOption) (*oauth2.Token, error) {
+	args := m.Called(ctx, code, opts)
+	return args.Get(0).(*oauth2.Token), args.Error(1)
+}
+
+func (m *MockOauthConfInterface) TokenSource(ctx context.Context, t *oauth2.Token) oauth2.TokenSource {
+	args := m.Called(ctx, t)
+	return args.Get(0).(oauth2.TokenSource) // Note the type assertion to oauth2.TokenSource
+}
+
+func (m *MockOauthConfInterface) Client(ctx context.Context, t *oauth2.Token) *http.Client {
+	args := m.Called(ctx, t)
+	return args.Get(0).(*http.Client)
 }
 
 func TestCloudbeds_Room_ToHotelRoom(t *testing.T) {
@@ -193,79 +307,28 @@ func (m *MockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	return args.Get(0).(*http.Response), args.Error(1)
 }
 
-//func TestCloudbeds_GetRooms(t *testing.T) {
-//
-//	// Define the JSON response
-//	responseJSON := `{
-//		"success": true,
-//		"data": [
-//			{
-//				"propertyID": "297652",
-//				"rooms": [
-//					{
-//						"roomID": "544559-0",
-//						"roomName": "DQ(1)",
-//						"roomDescription": "",
-//						"maxGuests": 2,
-//						"isPrivate": true,
-//						"roomBlocked": false,
-//						"roomTypeID": 544559,
-//						"roomTypeName": "Deluxe Queen",
-//						"roomTypeNameShort": "DQ"
-//					}
-//				]
-//			}
-//		],
-//		"count": 1,
-//		"total": 1
-//	}`
-//
-//	// Create a mock http.Response
-//	resp := &http.Response{
-//		StatusCode: 200,
-//		Body:       io.NopCloser(bytes.NewBufferString(responseJSON)),
-//	}
-//
-//	// Create a mock HTTPClient
-//	mockClient := new(MockHTTPClient)
-//	mockClient.On("Get", "https://hotels.cloudbeds.com/api/v1.1/getRooms").Return(resp, nil)
-//
-//	// Create a Cloudbeds instance with the mock HTTPClient
-//	cb := &Cloudbeds{
-//		httpClient: mockClient,
-//		log:        logrus.New(),
-//	}
-//
-//	// Call GetRooms
-//	rooms, err := cb.GetRooms()
-//
-//	// Assert no error occurred
-//	assert.Nil(t, err)
-//
-//	// Assert the Get function was called exactly once with the expected URL
-//	mockClient.AssertCalled(t, "Get", "https://hotels.cloudbeds.com/api/v1.1/getRooms")
-//
-//	// Test that the response was correctly parsed
-//	expectedRoom := hotel.Room{
-//		RoomID:            "544559-0",
-//		RoomName:          "DQ(1)",
-//		RoomDescription:   "",
-//		MaxGuests:         2,
-//		IsPrivate:         true,
-//		RoomBlocked:       false,
-//		RoomTypeID:        544559,
-//		RoomTypeName:      "Deluxe Queen",
-//		RoomTypeNameShort: "DQ",
-//		PhoneNumber:       "",
-//		RoomCondition:     "",
-//		RoomOccupied:      false,
-//	}
-//
-//	assert.Equal(t, expectedRoom, rooms[0], "Expected room: %v, got: %v", expectedRoom, rooms[0])
-//}
+func cleanupTestFiles(filename string) {
+	if err := os.Remove(filename); err != nil {
+		log.Fatalf("Failed to clean up test file: %s", err)
+	}
+}
+
+func cleanUpEnvVars() {
+	keys := []string{
+		"CLOUDBEDS_CLIENT_ID",
+		"CLOUDBEDS_CLIENT_SECRET",
+		"CLOUDBEDS_REDIRECT_URL",
+		"CLOUDBEDS_AUTH_URL",
+		"CLOUDBEDS_TOKEN_URL",
+		"CLOUDBEDS_SCOPES",
+	}
+	for _, key := range keys {
+		os.Unsetenv(key)
+	}
+}
 
 func TestCloudbeds_GetRooms(t *testing.T) {
-
+	cleanUpEnvVars()
 	//expected error for Bad JSON Format
 	typeValue := reflect.TypeOf(true) // Type of boolean since 'success' is expected to be a bool
 
@@ -397,7 +460,7 @@ func TestCloudbeds_GetRooms(t *testing.T) {
 }
 
 func TestCloudbeds_Room_SearchRoomIDByPhoneNumber(t *testing.T) {
-
+	cleanUpEnvVars()
 	log := logrus.New()
 
 	//get extensionsInfo from configuration.Extension
@@ -517,7 +580,7 @@ func TestCloudbeds_Room_SearchRoomIDByPhoneNumber(t *testing.T) {
 }
 
 func TestCloudbeds_postHousekeepingStatus(t *testing.T) {
-
+	cleanUpEnvVars()
 	mockRefresher := new(MockTokenRefresher)
 	mockRefresher.On("refreshToken").Return("", nil)
 
@@ -600,6 +663,7 @@ func TestCloudbeds_postHousekeepingStatus(t *testing.T) {
 }
 
 func TestCloudbeds_UpdateRoom(t *testing.T) {
+	cleanUpEnvVars()
 	// Create a mock HTTP server
 	postURL := "/api/v1.1/updateRoomCondition"
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -693,7 +757,7 @@ func TestCloudbeds_UpdateRoom(t *testing.T) {
 
 // Add your test cases
 func TestCloudbeds_setOauth2Config(t *testing.T) {
-
+	cleanUpEnvVars()
 	// Create a mock SecretStore
 	mockSecretStore := new(MockSecretsStore)
 	mockSecretStore.On("RetrieveVar", "CLOUDBEDS_SCOPES").Return("", nil)
@@ -773,6 +837,7 @@ func TestCloudbeds_setOauth2Config(t *testing.T) {
 }
 
 func TestCloudbeds_GetRoom(t *testing.T) {
+	cleanUpEnvVars()
 	tests := []struct {
 		name           string
 		roomNumber     string
@@ -843,6 +908,7 @@ func TestCloudbeds_GetRoom(t *testing.T) {
 }
 
 func TestCloudbeds_GenerateRandomString(t *testing.T) {
+	cleanUpEnvVars()
 	tests := []struct {
 		name        string
 		length      int
@@ -875,53 +941,10 @@ func TestCloudbeds_GenerateRandomString(t *testing.T) {
 	}
 }
 
-type MockSecretStore struct {
-	mock.Mock
-}
-
-func (m *MockSecretStore) StoreAccessToken(token string) error {
-	args := m.Called(token)
-	return args.Error(0)
-}
-
-func (m *MockSecretStore) StoreRefreshToken(token string) error {
-	args := m.Called(token)
-	return args.Error(0)
-}
-
-func (m *MockSecretStore) RetrieveAccessToken() (string, error) {
-	args := m.Called()
-	return args.String(0), args.Error(1)
-}
-
-func (m *MockSecretStore) RetrieveRefreshToken() (string, error) {
-	args := m.Called()
-	return args.String(0), args.Error(1)
-}
-
-func (m *MockSecretStore) StoreOauthState(state string) error {
-	args := m.Called(state)
-	return args.Error(0)
-}
-
-func (m *MockSecretStore) RetrieveOauthState(state string) (string, error) {
-	args := m.Called(state)
-	return args.String(0), args.Error(1)
-}
-
-func (m *MockSecretStore) RetrieveVar(varName string) (string, error) {
-	args := m.Called(varName)
-	return args.String(0), args.Error(1)
-}
-
-func (m *MockSecretStore) Close() error {
-	args := m.Called()
-	return args.Error(0)
-}
-
 // Implement other methods if necessary
 
 func TestCloudbeds_GetVarFromStoreOrEnvironment(t *testing.T) {
+	cleanUpEnvVars()
 	tests := []struct {
 		name           string
 		storeValue     string
@@ -955,7 +978,7 @@ func TestCloudbeds_GetVarFromStoreOrEnvironment(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup
-			mockStore := new(MockSecretStore)
+			mockStore := new(MockSecretsStore)
 			mockStore.On("RetrieveVar", mock.Anything).Return(tt.storeValue, tt.storeErr)
 
 			cloudbeds := &Cloudbeds{
@@ -978,7 +1001,7 @@ func TestCloudbeds_GetVarFromStoreOrEnvironment(t *testing.T) {
 }
 
 func TestCloudbeds_LoadApiConfiguration(t *testing.T) {
-
+	cleanUpEnvVars()
 	// Create testdata directory if it does not exist
 	if _, err := os.Stat("testdata"); os.IsNotExist(err) {
 		_ = os.Mkdir("testdata", 0755)
@@ -1056,4 +1079,549 @@ func TestCloudbeds_LoadApiConfiguration(t *testing.T) {
 	//remove test directory if any
 	os.Remove("testdata")
 
+}
+
+func TestHandleInitialLogin(t *testing.T) {
+	//define variables to speed up
+	cleanUpEnvVars()
+
+	tests := []struct {
+		name                 string
+		mockOauth2Config     error
+		mockOauthState       string
+		mockStoreErr         error
+		setEnvVars           bool
+		expectedMockOauthURL string
+		expectErrMsg         string
+		expectErr            bool
+	}{
+		{
+			name:                 "successful case",
+			mockOauth2Config:     nil,
+			mockOauthState:       "randomState",
+			mockStoreErr:         nil,
+			expectedMockOauthURL: "test_auth_url?client_id=test_client_id&redirect_uri=test_redirect_url&response_type=code&scope=test_scopes&state",
+			setEnvVars:           true,
+			expectErrMsg:         "",
+			expectErr:            false,
+		},
+		{
+			name:                 "error: not all vars are set",
+			mockOauth2Config:     nil,
+			mockOauthState:       "randomState",
+			mockStoreErr:         nil,
+			setEnvVars:           false,
+			expectedMockOauthURL: "http://auth.url",
+			expectErrMsg:         "Not all required env variables are set. Missed one of: CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET, CLOUDBEDS_REDIRECT_URL, CLOUDBEDS_SCOPES, CLOUDBEDS_AUTH_URL, CLOUDBEDS_TOKEN_URL",
+			expectErr:            true,
+		},
+		{
+			name:                 "error: oauth2 config",
+			mockOauth2Config:     errors.New("config error"),
+			mockOauthState:       "randomState",
+			mockStoreErr:         errors.New("store error"),
+			setEnvVars:           true,
+			expectedMockOauthURL: "http://auth.url",
+			expectErrMsg:         "store error",
+			expectErr:            true,
+		},
+		// Add more test cases here
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockSecretStore := new(MockSecretsStore)
+			mockLogger := logrus.New()
+			mockLogger.SetOutput(io.Discard)
+
+			cleanUpEnvVars()
+
+			if tt.setEnvVars {
+				//set env variables
+				os.Setenv("CLOUDBEDS_CLIENT_ID", "test_client_id")
+				os.Setenv("CLOUDBEDS_CLIENT_SECRET", "test_client_secret")
+				os.Setenv("CLOUDBEDS_REDIRECT_URL", "test_redirect_url")
+				os.Setenv("CLOUDBEDS_AUTH_URL", "test_auth_url")
+				os.Setenv("CLOUDBEDS_TOKEN_URL", "test_token_url")
+				os.Setenv("CLOUDBEDS_SCOPES", "test_scopes")
+			}
+
+			cloudbeds := &Cloudbeds{
+				storeClient: mockSecretStore,
+				log:         mockLogger,
+			}
+
+			//Bypass the RetrieveVar call.
+			//Trade-off here: we do not to check internal implementation of the function thus making the test less fragile in case of tested function refactoring.
+			//Another option would be to do .Once(), .Twice() etc. on the mockSecretStore. That would make the test more fragile in case of refactoring and depended on the internal implementation of tested function (i.e. call of "RetrieveVar"). However, it would check that the function is called with the correct parameters and it will not leave leftovers in case of "RetrieveVar" is removed from tested function.
+			mockSecretStore.On("RetrieveVar", mock.Anything).Return("", nil)
+			if tt.setEnvVars {
+				mockSecretStore.On("StoreOauthState", mock.Anything).Return(tt.mockStoreErr)
+			}
+
+			url, err := cloudbeds.HandleInitialLogin()
+
+			if tt.expectErr {
+				assert.NotNil(t, err)
+				assert.Equal(t, tt.expectErrMsg, err.Error())
+			} else {
+				assert.Nil(t, err)
+				assert.Contains(t, url, tt.expectedMockOauthURL)
+			}
+
+			mockSecretStore.AssertExpectations(t)
+		})
+	}
+}
+
+func TestLogin(t *testing.T) {
+	cleanUpEnvVars()
+
+	tests := []struct {
+		name                     string
+		mockRetrieveRefreshToken string
+		mockRetrieveRefreshErr   error
+		mockStoreOauthStateErr   error
+		oauthTockenSource        string
+		expectedStatusCodeMsg    string
+		expectedMsg              string
+		expectErrMsg             string
+		expectErr                bool
+	}{
+		{
+			name:                     "Case 1: Valid Refresh Token",
+			mockRetrieveRefreshToken: "some_valid_token",
+			mockRetrieveRefreshErr:   nil,
+			mockStoreOauthStateErr:   nil,
+			oauthTockenSource:        "someURL",
+			expectedStatusCodeMsg:    "ok",
+			expectedMsg:              "",
+			expectErrMsg:             "",
+			expectErr:                false,
+		},
+		{
+			name:                     "Case 2: Invalid Refresh Token",
+			mockRetrieveRefreshToken: "",
+			mockRetrieveRefreshErr:   errors.New("no-refresh-token-found"),
+			mockStoreOauthStateErr:   nil,
+			expectedStatusCodeMsg:    "fatal-error",
+			expectedMsg:              "failed to retrieve refresh token from secret store: no-refresh-token-found",
+			expectErrMsg:             "failed to retrieve refresh token from secret store: no-refresh-token-found",
+			expectErr:                true,
+		},
+		// Add more cases
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockSecretStore := new(MockSecretsStore)
+			mockLogger := logrus.New()
+			mockLogger.SetOutput(io.Discard)
+			mockOauthConf := new(MockOauthConfInterface)
+
+			tokenSource := oauth2.StaticTokenSource(
+				&oauth2.Token{AccessToken: "some-access-token"},
+			)
+
+			cloudbeds := &Cloudbeds{
+				storeClient: mockSecretStore,
+				log:         mockLogger,
+				oauthConf:   mockOauthConf,
+			}
+
+			mockSecretStore.On("RetrieveRefreshToken").Return(tt.mockRetrieveRefreshToken, tt.mockRetrieveRefreshErr)
+			mockSecretStore.On("StoreOauthState", mock.Anything).Return(tt.mockStoreOauthStateErr)
+			mockOauthConf.On("AuthCodeURL", mock.Anything, mock.Anything).Return("someAuthCodeURL")
+			mockOauthConf.On("TokenSource", mock.Anything, mock.AnythingOfType("*oauth2.Token")).Return(tokenSource)
+
+			statusCodeMsg, msg, err := cloudbeds.login(mockSecretStore)
+
+			if tt.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tt.expectedStatusCodeMsg, statusCodeMsg)
+			assert.Equal(t, tt.expectedMsg, msg)
+
+		})
+	}
+}
+
+func TestCloudbeds_RefreshToken(t *testing.T) {
+	cleanUpEnvVars()
+
+	tests := []struct {
+		name              string
+		expectedError     error
+		setOauth2Config   error
+		refreshTokenErr   error
+		newTokenErr       error
+		retrieveVarString string
+		storeAccessToken  error
+		setEnv            bool
+	}{
+		//do not test success. Too complex to mock
+		{
+			name:              "setOauth2Config error",
+			setOauth2Config:   errors.New("someError"),
+			expectedError:     errors.New("Not all required env variables are set. Missed one of: CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET, CLOUDBEDS_REDIRECT_URL, CLOUDBEDS_SCOPES, CLOUDBEDS_AUTH_URL, CLOUDBEDS_TOKEN_URL"),
+			refreshTokenErr:   nil,
+			retrieveVarString: "",
+		},
+		{
+			name:              "RetrieveRefreshToken error",
+			setOauth2Config:   nil,
+			expectedError:     errors.New("failed to retrieve refresh token from secret store: someError"),
+			refreshTokenErr:   errors.New("someError"),
+			retrieveVarString: "some_value",
+		},
+		{
+			name:              "failed protocol schema",
+			setOauth2Config:   nil,
+			expectedError:     errors.New("failed to get new access token. Looks like refresh token is stale. Clearing it and try to login again. Error: Post \"some_value\": unsupported protocol scheme \"\""),
+			refreshTokenErr:   nil,
+			retrieveVarString: "some_value",
+		},
+		{
+			name:              "host lookup failed",
+			setOauth2Config:   nil,
+			expectedError:     errors.New("failed to get new access token. Looks like refresh token is stale. Clearing it and try to login again. Error: Post"),
+			refreshTokenErr:   nil,
+			retrieveVarString: "https://some_value",
+		},
+		{
+			name:              "host available, but oauth2 returns error",
+			setOauth2Config:   nil,
+			expectedError:     errors.New("failed to get new access token. Looks like refresh token is stale. Clearing it and try to login again. Error: oauth2"),
+			refreshTokenErr:   nil,
+			retrieveVarString: "https://google.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			logger := logrus.New()
+			logger.SetOutput(io.Discard)
+			mockStoreClient := new(MockSecretsStore)
+			mockOauthConf := new(MockOauthConfInterface)
+			p := &Cloudbeds{
+				log:         logger,
+				storeClient: mockStoreClient,
+				oauthConf:   mockOauthConf,
+			}
+
+			mockStoreClient.On("RetrieveRefreshToken").Return("someRefreshToken", tt.refreshTokenErr)
+			mockOauthConf.On("TokenSource", mock.Anything, mock.Anything).Return(mock.Anything)
+			mockOauthConf.On("Client", mock.Anything, mock.Anything).Return(&http.Client{})
+			mockStoreClient.On("StoreAccessToken", mock.Anything).Return(tt.storeAccessToken)
+			mockStoreClient.On("RetrieveVar", mock.Anything).Return(tt.retrieveVarString, nil)
+
+			err := p.refreshToken()
+
+			assert.Contains(t, err.Error(), tt.expectedError.Error())
+		})
+	}
+}
+
+func TestHandleOAuthCallback(t *testing.T) {
+	cleanUpEnvVars()
+	tests := []struct {
+		name            string
+		state           string
+		code            string
+		mockState       string
+		mockStateErr    error
+		mockToken       *oauth2.Token
+		mockTokenErr    error
+		mockStoreAT     error
+		mockStoreRT     error
+		mockHttpClient  *http.Client
+		exchangeOptions []oauth2.AuthCodeOption
+		expectedError   string
+	}{
+		{
+			name:           "RetrieveOauthState fails",
+			state:          "someState",
+			code:           "someCode",
+			mockStateErr:   errors.New("state error"),
+			mockToken:      &oauth2.Token{AccessToken: "some_token"},
+			mockHttpClient: &http.Client{},
+			expectedError:  "failed to retrieve oauth state",
+		},
+		{
+			name:           "state doesn't match",
+			state:          "someState",
+			code:           "someCode",
+			mockState:      "otherState",
+			mockToken:      &oauth2.Token{AccessToken: "some_token"},
+			mockHttpClient: &http.Client{},
+			expectedError:  "invalid oauth state",
+		},
+		{
+			name:            "Exchange fails",
+			state:           "someState",
+			code:            "someCode",
+			mockState:       "someState",
+			mockToken:       &oauth2.Token{AccessToken: "some_token"},
+			mockTokenErr:    errors.New("exchange error"),
+			mockHttpClient:  &http.Client{},
+			exchangeOptions: []oauth2.AuthCodeOption{},
+			expectedError:   "oauthConf.Exchange() failed",
+		},
+		{
+			name:            "StoreAccessToken fails",
+			state:           "someState",
+			code:            "someCode",
+			mockState:       "someState",
+			mockToken:       &oauth2.Token{AccessToken: "some_token"},
+			mockStoreAT:     errors.New("store access token error"),
+			mockHttpClient:  &http.Client{},
+			exchangeOptions: []oauth2.AuthCodeOption{},
+			expectedError:   "store access token error",
+		},
+		{
+			name:            "StoreRefreshToken fails",
+			state:           "someState",
+			code:            "someCode",
+			mockState:       "someState",
+			mockToken:       &oauth2.Token{AccessToken: "some_token"},
+			mockStoreRT:     errors.New("store refresh token error"),
+			mockHttpClient:  &http.Client{},
+			exchangeOptions: []oauth2.AuthCodeOption{},
+			expectedError:   "store refresh token error",
+		},
+		{
+			name:            "success",
+			state:           "someState",
+			code:            "someCode",
+			mockState:       "someState",
+			mockToken:       &oauth2.Token{AccessToken: "some_token"},
+			mockHttpClient:  &http.Client{},
+			exchangeOptions: []oauth2.AuthCodeOption{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockStore := new(MockSecretsStore)
+			mockOauth := new(MockOauthConfInterface)
+			logger := logrus.New()
+			logger.SetOutput(io.Discard)
+
+			p := &Cloudbeds{
+				storeClient: mockStore,
+				oauthConf:   mockOauth,
+				log:         logger,
+			}
+
+			mockStore.On("RetrieveOauthState", tt.state).Return(tt.mockState, tt.mockStateErr)
+			mockOauth.On("Exchange", context.Background(), tt.code, []oauth2.AuthCodeOption(nil)).Return(tt.mockToken, tt.mockTokenErr)
+			mockStore.On("StoreAccessToken", mock.Anything).Return(tt.mockStoreAT)
+			mockStore.On("StoreRefreshToken", mock.Anything).Return(tt.mockStoreRT)
+			mockOauth.On("Client", context.Background(), mock.AnythingOfType("*oauth2.Token")).Return(tt.mockHttpClient)
+
+			err := p.HandleOAuthCallback(tt.state, tt.code)
+
+			if tt.expectedError == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			}
+		})
+	}
+}
+
+func TestNew(t *testing.T) {
+
+	apiConfFileName := "test_cloudbeds_api_params.json"
+	createCloudbedsApiConfigFile(apiConfFileName)
+
+	tests := []struct {
+		name                    string
+		loadConfigErr           error
+		retrieveAccessTokenErr  error
+		retrieveRefreshTokenErr error
+		retrieveVarValue        string
+		retrieveVarErr          error
+		loginMsg                string
+		loginStatusCode         string
+		apiConfFileName         string
+		setEnvVars              bool
+		expectedErr             string
+	}{
+		{
+			name:            "loadApiConfiguration error",
+			loadConfigErr:   errors.New("failed to load config"),
+			expectedErr:     "no such file or directory",
+			apiConfFileName: "file_not_exists.json",
+		},
+		{
+			name:             "setOauth2Config error",
+			expectedErr:      "Not all required env variables are set",
+			retrieveVarValue: "",
+			retrieveVarErr:   nil,
+			setEnvVars:       false,
+			apiConfFileName:  apiConfFileName,
+		},
+		{
+			name:            "success",
+			setEnvVars:      true,
+			apiConfFileName: apiConfFileName,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cleanUpEnvVars()
+			if tt.setEnvVars {
+				//set env variables
+				os.Setenv("CLOUDBEDS_CLIENT_ID", "test_client_id")
+				os.Setenv("CLOUDBEDS_CLIENT_SECRET", "test_client_secret")
+				os.Setenv("CLOUDBEDS_REDIRECT_URL", "test_redirect_url")
+				os.Setenv("CLOUDBEDS_AUTH_URL", "test_auth_url")
+				os.Setenv("CLOUDBEDS_TOKEN_URL", "test_token_url")
+				os.Setenv("CLOUDBEDS_SCOPES", "test_scopes")
+			}
+
+			logger := logrus.New()
+			logger.SetOutput(io.Discard)
+			mockStoreClient := new(MockSecretsStore)
+			mockConfig := &configuration.ConfigMap{ApiCfgFileName: tt.apiConfFileName}
+
+			mockStoreClient.On("RetrieveAccessToken").Return("some_token", tt.retrieveAccessTokenErr)
+			mockStoreClient.On("RetrieveRefreshToken").Return("some_token", tt.retrieveRefreshTokenErr)
+			mockStoreClient.On("RetrieveVar", mock.Anything).Return(tt.retrieveVarValue, tt.retrieveVarErr) // Replace "some_value" and nil with whatever you want the function to return
+
+			client, err := New(logger, mockStoreClient, mockConfig)
+
+			if tt.expectedErr != "" {
+				assert.Error(t, err)
+				assert.Nil(t, client)
+				assert.Contains(t, err.Error(), tt.expectedErr)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, client)
+			}
+		})
+	}
+	cleanUpEnvVars()
+	cleanupTestFiles(apiConfFileName)
+}
+
+func createCloudbedsApiConfigFile(filename string) {
+	jsonStr := `{
+  "apiURLs": {
+    "getRooms": "https://hotels.cloudbeds.com/api/v1.2/getRooms",
+    "postHousekeepingStatus": "https://hotels.cloudbeds.com/api/v1.2/postHousekeepingStatus"
+  },
+  "roomStatuses": [
+    "clean",
+    "dirty"
+  ]
+}`
+
+	err := os.WriteFile(filename, []byte(jsonStr), 0644)
+	if err != nil {
+		log.Fatalf("Writing to file failed: %s", err)
+	}
+}
+
+func TestNewClient4CallbackAndInit(t *testing.T) {
+	cleanUpEnvVars()
+	mockLog := logrus.New()
+	mockLog.SetOutput(io.Discard)
+
+	testCases := []struct {
+		name             string
+		accessToken      string
+		accessTokenError error
+		expectedError    error
+		expectedClient   bool
+	}{
+		{
+			name:             "Success case: setOauth2Config() doesn't return an error",
+			accessToken:      "some-access-token",
+			accessTokenError: nil,
+			expectedError:    nil,
+			expectedClient:   true,
+		},
+		{
+			name:             "Error case: setOauth2Config() returns an error",
+			accessToken:      "",
+			accessTokenError: errors.New("some error"),
+			expectedError:    errors.New("Not all required env variables are set. Missed one of"),
+			expectedClient:   false,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			mockSecretStore := new(MockSecretsStore)
+			mockSecretStore.On("RetrieveVar", mock.Anything).Return(tt.accessToken, tt.accessTokenError)
+			cloudbedsClient, err := NewClient4CallbackAndInit(mockLog, mockSecretStore)
+			if tt.expectedError != nil {
+				assert.NotNil(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+			} else {
+				assert.Nil(t, err)
+			}
+
+			if tt.expectedClient {
+				assert.NotNil(t, cloudbedsClient)
+			} else {
+				assert.Nil(t, cloudbedsClient)
+			}
+
+		})
+	}
+}
+
+func TestClose(t *testing.T) {
+	testCases := []struct {
+		name                  string
+		closeError            error
+		expectedLogErrorValue error
+	}{
+		{
+			name:                  "Success case: Close() doesn't return an error",
+			closeError:            nil,
+			expectedLogErrorValue: nil,
+		},
+		{
+			name:                  "Error case: Close() returns an error",
+			closeError:            errors.New("some error"),
+			expectedLogErrorValue: errors.New("failed to close secret store: some error"),
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			mockLog := logrus.New()
+			mockSecretStore := new(MockSecretsStore)
+			// Using a log hook to capture log entries for assertion
+			hook := test.NewLocal(mockLog)
+
+			mockSecretStore.On("Close").Return(tt.closeError)
+
+			cloudbedsClient := &Cloudbeds{
+				log:         mockLog,
+				storeClient: mockSecretStore,
+			}
+
+			err := cloudbedsClient.Close()
+
+			if tt.expectedLogErrorValue != nil {
+				assert.Equal(t, 1, len(hook.Entries))
+				assert.Equal(t, err, tt.expectedLogErrorValue)
+				assert.Equal(t, logrus.ErrorLevel, hook.LastEntry().Level)
+				assert.Contains(t, hook.LastEntry().Message, tt.expectedLogErrorValue.Error())
+			} else {
+				assert.Nil(t, err)
+				assert.Equal(t, 0, len(hook.Entries))
+			}
+		})
+	}
 }
