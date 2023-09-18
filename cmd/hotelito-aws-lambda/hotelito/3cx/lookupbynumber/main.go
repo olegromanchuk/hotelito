@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"github.com/olegromanchuk/hotelito/internal/logging"
 	"github.com/olegromanchuk/hotelito/pkg/pbx/pbx3cx"
 	"github.com/sirupsen/logrus"
@@ -45,14 +44,7 @@ func HandleLookupByNumber(ctx context.Context, request events.APIGatewayProxyReq
 	log.Debugf("Handling lookup by number request: %v", request)
 	number := request.QueryStringParameters["Number"]
 
-	jsonAsBytes, err := pbx3cx.ProcessLookupByNumber(number) //returns dummy contact with "number"
-	if err != nil {
-		log.Error(err)
-		return events.APIGatewayProxyResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       fmt.Sprintf("Error: %v", err),
-		}, nil
-	}
+	jsonAsBytes := pbx3cx.ProcessLookupByNumber(number) //returns dummy contact with "number"
 
 	return events.APIGatewayProxyResponse{
 		StatusCode: http.StatusOK,
