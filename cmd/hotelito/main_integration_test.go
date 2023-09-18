@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/sirupsen/logrus"
 	"net/http"
 	"os"
 	"strings"
@@ -19,10 +20,22 @@ func TestMainFunction(t *testing.T) {
 	defer os.Remove(envTestFileName)
 	defer file.Close()
 
+	//create test_config.json file for testing
+	configTestFileName := "test_config.json"
+	fileConfig := createTestConfigFile(configTestFileName)
+	defer os.Remove(configTestFileName)
+	defer fileConfig.Close()
+
+	//create test_cloudbeds_api_params.json file for testing
+	configApiParams := "test_cloudbeds_api_params.json"
+	fileApiConfig := createAPIParamsConfigFile(configApiParams)
+	defer os.Remove(configApiParams)
+	defer fileApiConfig.Close()
+
 	hook := test.NewGlobal()
 	quit := make(chan struct{})
 
-	go runServer(envTestFileName, quit)
+	go runServer(envTestFileName, logrus.StandardLogger(), quit)
 
 	time.Sleep(2 * time.Second)
 
@@ -36,7 +49,7 @@ func TestMainFunction(t *testing.T) {
 	assert.True(t, found, "Expected log message not found")
 
 	// Perform your HTTP tests here.
-	resp, err := http.Get("http://localhost:8080/")
+	resp, err := http.Get("http://localhost:8080/api/v1/healthcheck")
 	assert.NoError(t, err)
 	assert.Equal(t, 200, resp.StatusCode)
 

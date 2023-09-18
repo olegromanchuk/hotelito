@@ -35,13 +35,12 @@ func main() {
 	flag.Parse()
 
 	quit := make(chan struct{})
-	runServer(*configFileName, quit)
+	//define logger
+	logger := logrus.New()
+	runServer(*configFileName, logger, quit)
 }
 
-func runServer(envFileName string, quit chan struct{}) {
-
-	//define logger
-	log := logrus.New()
+func runServer(envFileName string, log *logrus.Logger, quit chan struct{}) {
 
 	//load .env variables into environment
 	readAuthVarsFromFile(envFileName, log)
@@ -106,6 +105,7 @@ func runServer(envFileName string, quit chan struct{}) {
 
 	//auth urls
 	api.HandleFunc("/", h.HandleMain).Methods("GET")
+	api.HandleFunc("/healthcheck", h.HandleHealthcheck).Methods("GET")
 	api.HandleFunc("/login", h.HandleManualLogin).Methods("GET")
 	api.HandleFunc("/callback", h.HandleCallback).Methods("GET")
 
@@ -130,7 +130,7 @@ func runServer(envFileName string, quit chan struct{}) {
 	server := &http.Server{Addr: port}
 
 	go func() {
-		fmt.Printf("Starting server on port %s", port)
+		log.Printf("Starting server on port %s", port)
 		if err := server.ListenAndServe(); err != http.ErrServerClosed {
 			log.Fatalf("Server failed: %v", err)
 		}

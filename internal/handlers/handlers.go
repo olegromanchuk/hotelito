@@ -182,3 +182,7 @@ func (h *Handler) HandleGetRooms(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleMain(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, `<a href="/login">Login with OAuth2 Provider</a>`)
 }
+
+func (h *Handler) HandleHealthcheck(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "OK")
+}
