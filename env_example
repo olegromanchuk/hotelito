@@ -1,6 +1,6 @@
 ENVIRONMENT=production
 APPLICATION_NAME=hotelito-app
-# acceptable values: debug, info, warn, error, fatal, panic, trace
+# acceptable values: panic, fatal, error, warn, info, debug, trace
 LOG_LEVEL=debug
 CLOUDBEDS_CLIENT_ID=mycompanyexample_LuPCZsereqdqdXjS
 CLOUDBEDS_CLIENT_SECRET=sadfsadkjHKJujewnfw32SDDFFD

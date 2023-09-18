@@ -288,8 +288,7 @@ func TestProcessLookupByNumber(t *testing.T) {
 			Contact Contact `json:"contact"`
 		}{Contact: expectedContact})
 
-		body, err := pbx3cxClient.ProcessLookupByNumber(number)
-		assert.Nil(t, err)
+		body := pbx3cxClient.ProcessLookupByNumber(number)
 		assert.Equal(t, expectedBody, body)
 	})
 

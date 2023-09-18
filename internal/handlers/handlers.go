@@ -106,15 +106,11 @@ func (h *Handler) Handle3cxLookup(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	number := query.Get("Number")
 
-	jsonAsBytes, err := h.PBX.ProcessLookupByNumber(number) //returns dummy contact with "number"
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	jsonAsBytes := h.PBX.ProcessLookupByNumber(number) //returns dummy contact with "number"
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	_, err = w.Write(jsonAsBytes)
+	_, err := w.Write(jsonAsBytes)
 	if err != nil {
 		h.Log.Error(err)
 		return
@@ -181,4 +177,8 @@ func (h *Handler) HandleGetRooms(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) HandleMain(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, `<a href="/login">Login with OAuth2 Provider</a>`)
+}
+
+func (h *Handler) HandleHealthcheck(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "OK")
 }

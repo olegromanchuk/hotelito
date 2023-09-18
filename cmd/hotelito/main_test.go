@@ -11,16 +11,13 @@ import (
 	"testing"
 )
 
-func Test_readAuthVarsFromFile(t *testing.T) {
-
-	envTestFileName := ".env_test"
+func createEnvFile(envTestFileName string) (file *os.File) {
 	//create .env file for testing
 	file, err := os.Create(envTestFileName)
 	if err != nil {
 		fmt.Printf("Error creating file %v:. Error: %v", envTestFileName, err)
-		return
+		panic(err)
 	}
-	defer file.Close()
 
 	envContent := `ENVIRONMENT=production
 APPLICATION_NAME=hotelito-app
@@ -31,8 +28,8 @@ CLOUDBEDS_REDIRECT_URL=https://mypublic.api.address/api/v1/callback
 CLOUDBEDS_SCOPES=read:hotel,read:reservation,write:reservation,read:room,write:room,read:housekeeping,write:housekeeping
 CLOUDBEDS_AUTH_URL=https://hotels.cloudbeds.com/api/v1.1/oauth
 CLOUDBEDS_TOKEN_URL=https://hotels.cloudbeds.com/api/v1.1/access_token
-HOSPITALITY_PHONE2ROOM_MAP_FILENAME=config.json
-HOSPITALITY_API_CONF_FILENAME=cloudbeds_api_params.json
+HOSPITALITY_PHONE2ROOM_MAP_FILENAME=test_config.json
+HOSPITALITY_API_CONF_FILENAME=test_cloudbeds_api_params.json
 PORT=8080
 AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID=hotelito-app-3cxroomextension-cloudbedsroomid
 AWS_S3_BUCKET_4_CLBEDS_API_CONF=hotelito-app-3cxroomextension-cloudbedsroomid
@@ -42,10 +39,109 @@ STANDALONE_VERSION_BOLT_DB_BUCKET_NAME=cloudbeds_creds`
 	_, err = file.WriteString(envContent)
 	if err != nil {
 		fmt.Println("Error writing to file:", err)
-		return
+		panic(err)
 	}
 
 	fmt.Println(".env file has been created.")
+	return file
+}
+
+func createTestConfigFile(configTestFileName string) *os.File {
+	// Create new file
+	file, err := os.Create(configTestFileName)
+	if err != nil {
+		fmt.Printf("Error creating file %v: Error: %v", configTestFileName, err)
+		panic(err)
+	}
+
+	// Data in plain string
+	configData := `{
+  "extension_map": [
+    {
+      "room_extension": "1000",
+      "hospitality_room_id": "544559-0",
+      "hospitality_room_name": "DQ-1"
+    },
+    {
+      "room_extension": "1001",
+      "hospitality_room_id": "544559-1",
+      "hospitality_room_name": "DQ-2"
+    },
+    {
+      "room_extension": "1003",
+      "hospitality_room_id": "544559-2",
+      "hospitality_room_name": "DQ-3"
+    }
+  ],
+  "housekeeper_map": [
+    {
+      "room_status_phone_number": "2222222221",
+      "housekeeper_name": "Michael Jackson",
+      "number_type": "dirty"
+    },
+    {
+      "room_status_phone_number": "2222222222",
+      "housekeeper_name": "Michael Jackson",
+      "number_type": "clean"
+    },
+    {
+      "room_status_phone_number": "2222222232",
+      "housekeeper_name": "Madonna",
+      "number_type": "dirty"
+    },
+    {
+      "room_status_phone_number": "2222222233",
+      "housekeeper_name": "Madonna",
+      "number_type": "clean"
+    }
+  ]
+}`
+
+	// Write to file
+	_, err = file.WriteString(configData)
+	if err != nil {
+		fmt.Println("Error writing to file:", err)
+		panic(err)
+	}
+
+	fmt.Println("test_config.json file has been created.")
+	return file
+}
+
+func createAPIParamsConfigFile(jsonTestFileName string) (file *os.File) {
+	// Create JSON config file for testing
+	file, err := os.Create(jsonTestFileName)
+	if err != nil {
+		fmt.Printf("Error creating file %v: Error: %v\n", jsonTestFileName, err)
+		panic(err)
+	}
+
+	jsonContent := `{
+  "apiURLs": {
+    "getRooms": "https://hotels.cloudbeds.com/api/v1.2/getRooms",
+    "postHousekeepingStatus": "https://hotels.cloudbeds.com/api/v1.2/postHousekeepingStatus"
+  },
+  "roomStatuses": [
+    "clean",
+    "dirty"
+  ]
+}`
+
+	_, err = file.WriteString(jsonContent)
+	if err != nil {
+		fmt.Println("Error writing to file:", err)
+		panic(err)
+	}
+
+	fmt.Println("API Params Config file has been created.")
+	return file
+}
+
+func Test_readAuthVarsFromFile(t *testing.T) {
+	envTestFileName := ".env_test"
+	file := createEnvFile(envTestFileName)
+	defer os.Remove(envTestFileName)
+	defer file.Close()
 
 	//test that environmental vars are loaded into memory
 	t.Run("check that file .env is properly loaded into memory", func(t *testing.T) {
@@ -66,7 +162,6 @@ STANDALONE_VERSION_BOLT_DB_BUCKET_NAME=cloudbeds_creds`
 			t.Errorf("For env variable %s, expected %s but got %s", key, expectedValue, actualValue)
 		}
 	}
-	os.Remove(envTestFileName)
 }
 
 func TestInitializeStore(t *testing.T) {

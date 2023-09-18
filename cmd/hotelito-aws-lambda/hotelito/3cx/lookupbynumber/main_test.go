@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"github.com/aws/aws-lambda-go/events"
 	"github.com/stretchr/testify/mock"
 	"os"
 	"testing"
@@ -58,36 +60,33 @@ type MockPBX3CXClient struct {
 	mock.Mock
 }
 
-//func TestHandleLookupByNumber(t *testing.T) {
-//	// Set environment variables for the test
-//	os.Setenv("APPLICATION_NAME", "test-app")
-//	os.Setenv("ENVIRONMENT", "test-env")
-//	os.Setenv("AWS_REGION", "test-region")
-//
-//	mockStore := new(MockStoreClient)
-//	mockCloudbeds := new(MockCloudbedsClient)
-//	mockPBX3CX := new(MockPBX3CXClient)
-//
-//	// Setup mock expectations
-//	expectedNumber := "12345"
-//	mockCloudbeds.On("SomeCloudbedsMethod", expectedNumber).Return("DummyContact", nil)
-//	mockPBX3CX.On("SomePBX3CXMethod", expectedNumber).Return(nil)
-//
-//	req := events.APIGatewayProxyRequest{
-//		QueryStringParameters: map[string]string{"Number": expectedNumber},
-//	}
-//
-//	ctx := context.TODO()
-//
-//	// Run the function under test
-//	resp, err := HandleLookupByNumber(ctx, req)
-//
-//	// Validate
-//	assert.NotNil(t, resp)
-//	assert.Nil(t, err)
-//
-//	// Validate mock expectations
-//	mockStore.AssertExpectations(t)
-//	mockCloudbeds.AssertExpectations(t)
-//	mockPBX3CX.AssertExpectations(t)
-//}
+func TestHandleLookupByNumber(t *testing.T) {
+	// Set environment variables for the test
+	os.Setenv("APPLICATION_NAME", "test-app")
+	os.Setenv("ENVIRONMENT", "test-env")
+	os.Setenv("AWS_REGION", "test-region")
+
+	mockStore := new(MockStoreClient)
+
+	// Setup mock expectations
+	expectedNumber := "12345"
+
+	req := events.APIGatewayProxyRequest{
+		QueryStringParameters: map[string]string{"Number": expectedNumber},
+	}
+
+	ctx := context.TODO()
+
+	// Run the function under test
+	resp, err := HandleLookupByNumber(ctx, req)
+
+	// Validate
+	assert.NotNil(t, resp)
+	assert.Nil(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+	assert.Equal(t, "{\"contact\":{\"id\":12345,\"firstname\":\"dummyFirstName\",\"company\":\"dummyCompany\",\"mobilephone\":\"12345\"}}", resp.Body)
+
+	// Validate mock expectations
+	mockStore.AssertExpectations(t)
+
+}
