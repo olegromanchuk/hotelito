@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/sirupsen/logrus"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -52,6 +53,11 @@ func TestMainFunction(t *testing.T) {
 	resp, err := http.Get("http://localhost:8080/api/v1/healthcheck")
 	assert.NoError(t, err)
 	assert.Equal(t, 200, resp.StatusCode)
+	body := resp.Body
+	defer body.Close()
+	buf := new(strings.Builder)
+	_, _ = io.Copy(buf, body)
+	assert.Equal(t, "OK", buf.String())
 
 	// Signal the main function to stop the server
 	close(quit)

@@ -26,9 +26,9 @@ func (m *MockPBXProvider) ProcessPBXRequest(jsonDecoder *json.Decoder) (pbx.Room
 	return args.Get(0).(pbx.Room), args.Error(1)
 }
 
-func (m *MockPBXProvider) ProcessLookupByNumber(number string) ([]byte, error) {
+func (m *MockPBXProvider) ProcessLookupByNumber(number string) []byte {
 	args := m.Called(number)
-	return args.Get(0).([]byte), args.Error(1)
+	return args.Get(0).([]byte)
 }
 
 type MockHospitalityProvider struct {
@@ -184,22 +184,6 @@ func TestHandler_Handle3cxLookup(t *testing.T) {
 			},
 			expectedBody:     `12345`,
 			expectedHttpCode: http.StatusOK,
-		},
-		{
-			name: "Unsuccesful lookup",
-			fields: fields{
-				Log:   logrus.New(),
-				PBX:   &MockPBXProvider{},
-				Hotel: &MockHospitalityProvider{},
-			},
-			responseErrorProcessLookupByNumberErr: errors.New("some error"),
-			responseErrorProcessLookupByNumber:    "12345",
-			args: args{
-				w: httptest.NewRecorder(),
-				r: httptest.NewRequest("GET", "/test/url?Number=14523", nil),
-			},
-			expectedBody:     "some error\n",
-			expectedHttpCode: http.StatusInternalServerError,
 		},
 	}
 	for _, tt := range tests {
