@@ -63,21 +63,45 @@ func HandleInit(ctx context.Context, request events.APIGatewayProxyRequest) (eve
 	log.Debugf("AWS_REGION: %s", awsRegion)
 
 	storePrefix := fmt.Sprintf("%s/%s", appName, environmentType) //hotelito-app-production
-	//current secret store - aws env variables
+
+	responseApiGateway, url, err := Execute(log, storePrefix, awsRegion)
+	if err != nil {
+		log.Errorf("Error executing handler: %v", err)
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       fmt.Sprintf("Error: %v", err),
+		}, nil
+	}
+
+	responseApiGateway = events.APIGatewayProxyResponse{
+		StatusCode: http.StatusFound,
+		Headers: map[string]string{
+			"Location": url,
+		},
+	}
+	return responseApiGateway, nil
+}
+
+func Execute(log *logrus.Logger, storePrefix, awsRegion string) (responseApiGateway events.APIGatewayProxyResponse, url string, returnError error) {
+
+	//Initialize current secret store - aws env variables
 	storeClient, err := awsstore.Initialize(log, storePrefix, awsRegion)
 	if err != nil {
-		log.Fatal(err)
+		errMsg := fmt.Sprintf("error initializing AWS SSM store with store prefix %s in region %s. Error: %v", storePrefix, awsRegion, err)
+		log.Fatal(errMsg)
 	}
+
 	storeClient.Log = log //set logger for store client
 
 	//create cloudbeds client
 	clbClient, err := cloudbeds.NewClient4CallbackAndInit(log, storeClient)
 	if err != nil {
 		log.Errorf("Error creating cloudbeds client: %v", err)
-		return events.APIGatewayProxyResponse{
+		responseApiGateway = events.APIGatewayProxyResponse{
 			StatusCode: http.StatusInternalServerError,
 			Body:       fmt.Sprintf("Error: %v", err),
-		}, nil
+		}
+		return responseApiGateway, url, nil
 	}
 
 	log.Debugf("Handling init")
@@ -87,22 +111,18 @@ func HandleInit(ctx context.Context, request events.APIGatewayProxyRequest) (eve
 	pbx3cxClient := &pbx3cx.PBX3CX{} //we do not need full-blown 3cx client for initial authorization
 	//define handlers
 	h := handlers.NewHandler(log, pbx3cxClient, clbClient)
-	url, err := h.Hotel.HandleInitialLogin()
+	url, err = h.Hotel.HandleInitialLogin()
 	if err != nil {
 		log.Error(err)
-		return events.APIGatewayProxyResponse{
+		responseApiGateway = events.APIGatewayProxyResponse{
 			StatusCode: http.StatusInternalServerError,
 			Body:       fmt.Sprintf("Error: %v", err),
-		}, nil
+		}
+		return responseApiGateway, url, nil
 	}
 	log.Debugf("redirect url: %s", url)
 
-	return events.APIGatewayProxyResponse{
-		StatusCode: http.StatusFound,
-		Headers: map[string]string{
-			"Location": url,
-		},
-	}, nil
+	return responseApiGateway, url, nil
 }
 
 func main() {
