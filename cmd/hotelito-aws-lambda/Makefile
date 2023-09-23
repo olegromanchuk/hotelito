@@ -1,5 +1,6 @@
 .PHONY: build
 
+# samconfig.toml is generated automatically after run 'sam deploy...' Check README.md for details
 AWS_CONFIG_PROFILE=$$(grep 'profile' ./samconfig.toml | awk -F '"' '{print $$2}' | cut -d'"' -f 1)
 
 build-all:

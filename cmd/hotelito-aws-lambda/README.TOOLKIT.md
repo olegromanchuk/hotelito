@@ -33,6 +33,6 @@ Similarly, if the Function declaration contained an API Gateway event, the API G
 
 ## Resources
 
-General information about this SAM project can be found in the [`README.md`](./README.md) file in this folder.
+General information about this SAM project can be found in the [`README.md`](./README_SAM.md) file in this folder.
 
 More information about using the AWS Toolkit For Visual Studio Code with serverless applications can be found [in the AWS documentation](https://docs.aws.amazon.com/toolkit-for-vscode/latest/userguide/serverless-apps.html) .

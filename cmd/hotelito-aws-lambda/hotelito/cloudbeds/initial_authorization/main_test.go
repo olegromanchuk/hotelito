@@ -16,7 +16,7 @@ func TestHandleInit(t *testing.T) {
 		// Fill in expected fields
 	}
 
-	response, err := handleRequest(ctx, req)
+	response, err := HandleInit(ctx, req)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedResponse, response)
 }

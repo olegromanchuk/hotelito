@@ -42,8 +42,8 @@ and so on. This is one of the most accessible options for achieving the result. 
 ## Getting Started
 You can install the integration as:
 - AWS lambda function on AWS
-- on a dedicated server (valid public https is required)
-- as a standalone app installed directly on 3CX (not recommended)
+- on a dedicated server (valid public https certificate is required)
+- as a standalone app installed directly on 3CX (not recommended and not tested)
 
 ### Prerequisites before app installation
 #### Cloudbeds
@@ -195,10 +195,12 @@ echo "make sure that .env file is present in the current directory and contains 
  docker run --name hotelito -p 8080:8080 hotelito
 ```
 
-### Local testing AWS
+### Local testing AWS lambda
 
 Use Makefile from /cmd/hotelito-aws-lambda directory.  
 `sync_environmental_vars.sh` will sync .env file => environmental_vars.json. It is not needed to update environmental_vars.json manually.
+
+Note: before using `sam local invoke` you need to have samconfig.toml file in the `hotelito-aws-lambda` directory. It is created by `sam deploy --guided` command. [More details on how `sam deploy` works](#how-sam-deploy-works)
 ```
 cd app/
 make build
@@ -212,11 +214,8 @@ sam local start-api -e events/event_org.json --env-vars environmental_vars.json
 `sam local generate-event apigateway aws-proxy --method POST --body '{"Number": "2222222501", "CallType": "Outbound", "CallDirection": "Outbound", "Name": "ExampleName", "Agent": "501", "AgentFirstName": "ExampleAgentFirstName", "DateTime": "2023-07-07T14:15:22Z"}' --path '3cx/outbound_call' > events/event_3cx_call.json`
 
 ### How sam deploy works
-`sam deploy --guided` when run first time creates CF script that creates sam S3 buckets for uploading lambda. Also, it creates a samconfig.toml file. If you set custom profile with `sam deploy --guided --profile MY_AWS_PROFILE`, then MY_AWS_PROFILE will appear in samconfig.toml as 
-```
-"profile"=MYPROFILE
-```
-deploy_aws.sh will check on this line and if it is not set will propose to use "default" profile.
+`sam deploy --guided` when run first time creates CF script that creates sam S3 buckets for uploading lambda. Also, it creates a samconfig.toml file. If you set custom profile with `sam deploy --guided --profile MY_AWS_PROFILE`, then MY_AWS_PROFILE will appear in samconfig.toml as `"profile"=MYPROFILE`  
+`deploy_aws.sh` will check on this line and if it is not set will propose to use "default" profile.
 
 
 ##### Consideration about aws parameter store:

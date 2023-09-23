@@ -5,7 +5,7 @@ This is a sample template for cloudbeds-3cx-go1.x - Below is a brief explanation
 ```bash
 .
 ├── Makefile                    <-- Make to automate build
-├── README.md                   <-- This instructions file
+├── README_SAM.md                   <-- This instructions file
 ├── hello-world                 <-- Source code for a lambda function
 │   ├── main.go                 <-- Lambda function code
 │   └── main_test.go            <-- Unit tests
