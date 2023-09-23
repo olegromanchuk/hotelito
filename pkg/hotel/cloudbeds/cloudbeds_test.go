@@ -1112,7 +1112,7 @@ func TestHandleInitialLogin(t *testing.T) {
 			mockStoreErr:         nil,
 			setEnvVars:           false,
 			expectedMockOauthURL: "http://auth.url",
-			expectErrMsg:         "Not all required env variables are set. Missed one of: CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET, CLOUDBEDS_REDIRECT_URL, CLOUDBEDS_SCOPES, CLOUDBEDS_AUTH_URL, CLOUDBEDS_TOKEN_URL",
+			expectErrMsg:         "not all required env variables are set. Missed one of: CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET, CLOUDBEDS_REDIRECT_URL, CLOUDBEDS_SCOPES, CLOUDBEDS_AUTH_URL, CLOUDBEDS_TOKEN_URL",
 			expectErr:            true,
 		},
 		{
@@ -1265,7 +1265,7 @@ func TestCloudbeds_RefreshToken(t *testing.T) {
 		{
 			name:              "setOauth2Config error",
 			setOauth2Config:   errors.New("someError"),
-			expectedError:     errors.New("Not all required env variables are set. Missed one of: CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET, CLOUDBEDS_REDIRECT_URL, CLOUDBEDS_SCOPES, CLOUDBEDS_AUTH_URL, CLOUDBEDS_TOKEN_URL"),
+			expectedError:     errors.New("not all required env variables are set. Missed one of: CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET, CLOUDBEDS_REDIRECT_URL, CLOUDBEDS_SCOPES, CLOUDBEDS_AUTH_URL, CLOUDBEDS_TOKEN_URL"),
 			refreshTokenErr:   nil,
 			retrieveVarString: "",
 		},
@@ -1460,7 +1460,7 @@ func TestNew(t *testing.T) {
 		},
 		{
 			name:             "setOauth2Config error",
-			expectedErr:      "Not all required env variables are set",
+			expectedErr:      "not all required env variables are set",
 			retrieveVarValue: "",
 			retrieveVarErr:   nil,
 			setEnvVars:       false,
@@ -1552,7 +1552,7 @@ func TestNewClient4CallbackAndInit(t *testing.T) {
 			name:             "Error case: setOauth2Config() returns an error",
 			accessToken:      "",
 			accessTokenError: errors.New("some error"),
-			expectedError:    errors.New("Not all required env variables are set. Missed one of"),
+			expectedError:    errors.New("not all required env variables are set. Missed one of"),
 			expectedClient:   false,
 		},
 	}

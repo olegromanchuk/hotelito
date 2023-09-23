@@ -643,7 +643,7 @@ func (p *Cloudbeds) setOauth2Config() error {
 	}
 	//check that all env variables are set
 	if oauthConfig.ClientID == "" || oauthConfig.ClientSecret == "" || oauthConfig.RedirectURL == "" || oauthConfig.Scopes == nil || oauthConfig.Endpoint.AuthURL == "" || oauthConfig.Endpoint.TokenURL == "" {
-		errMsg := fmt.Errorf("Not all required env variables are set. Missed one of: CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET, CLOUDBEDS_REDIRECT_URL, CLOUDBEDS_SCOPES, CLOUDBEDS_AUTH_URL, CLOUDBEDS_TOKEN_URL")
+		errMsg := fmt.Errorf("not all required env variables are set. Missed one of: CLOUDBEDS_CLIENT_ID, CLOUDBEDS_CLIENT_SECRET, CLOUDBEDS_REDIRECT_URL, CLOUDBEDS_SCOPES, CLOUDBEDS_AUTH_URL, CLOUDBEDS_TOKEN_URL")
 		p.log.Error(errMsg.Error())
 		return errMsg
 	}
