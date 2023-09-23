@@ -13,10 +13,40 @@ import (
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"os"
+	"time"
+)
+
+// vars below are used ONLY if env vars are not set (testing only). It is not supposed to happen in production.
+var (
+	defaultAppName         = "hotelito-app"
+	defaultEnvironmentType = "dev"
+	defaultAwsRegion       = "us-east-2"
 )
 
 func HandleInit(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	fmt.Println(request)
+	fmt.Printf("[%s] Started HandleInit", time.Now().String())
+
+	log := initializeLogger()
+	log.Debug(request)
+
+	responseApiGateway, url, err := Execute(log)
+	if err != nil {
+		log.Errorf("Error executing handler: %v", err)
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       fmt.Sprintf("Error: %v", err),
+		}, err
+	}
+
+	responseApiGateway.StatusCode = http.StatusFound
+	responseApiGateway.Headers = map[string]string{
+		"Location": url,
+	}
+
+	return responseApiGateway, nil
+}
+
+func initializeLogger() *logrus.Logger {
 	//define logger
 	log := logrus.New()
 
@@ -38,51 +68,15 @@ func HandleInit(ctx context.Context, request events.APIGatewayProxyRequest) (eve
 
 	log.SetLevel(logLevel)
 	log.SetOutput(os.Stdout)
-	log.Infof("Log level: %s", logLevelEnv)
+	log.Infof("Log level: %s", logLevel)
 
-	//get APP_NAME from env
-	appName := os.Getenv("APPLICATION_NAME")
-	if appName == "" {
-		log.Debug("APPLICATION_NAME env variable is not set")
-		appName = "hotelito-app"
-	}
-	log.Debugf("APPLICATION_NAME: %s", appName)
-
-	environmentType := os.Getenv("ENVIRONMENT")
-	if environmentType == "" {
-		log.Debug("ENVIRONMENT env variable is not set")
-		environmentType = "dev"
-	}
-	log.Debugf("ENVIRONMENT: %s", environmentType)
-
-	awsRegion := os.Getenv("AWS_REGION")
-	if awsRegion == "" {
-		log.Debug("AWS_REGION env variable is not set")
-		awsRegion = "us-east-2"
-	}
-	log.Debugf("AWS_REGION: %s", awsRegion)
-
-	storePrefix := fmt.Sprintf("%s/%s", appName, environmentType) //hotelito-app-production
-
-	responseApiGateway, url, err := Execute(log, storePrefix, awsRegion)
-	if err != nil {
-		log.Errorf("Error executing handler: %v", err)
-		return events.APIGatewayProxyResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       fmt.Sprintf("Error: %v", err),
-		}, nil
-	}
-
-	responseApiGateway = events.APIGatewayProxyResponse{
-		StatusCode: http.StatusFound,
-		Headers: map[string]string{
-			"Location": url,
-		},
-	}
-	return responseApiGateway, nil
+	return log
 }
 
-func Execute(log *logrus.Logger, storePrefix, awsRegion string) (responseApiGateway events.APIGatewayProxyResponse, url string, returnError error) {
+func Execute(log *logrus.Logger) (responseApiGateway events.APIGatewayProxyResponse, url string, returnError error) {
+
+	appName, environmentType, awsRegion := initializeVariablesFromEnv(log)
+	storePrefix := fmt.Sprintf("%s/%s", appName, environmentType) //hotelito-app-production
 
 	//Initialize current secret store - aws env variables
 	storeClient, err := awsstore.Initialize(log, storePrefix, awsRegion)
@@ -101,7 +95,7 @@ func Execute(log *logrus.Logger, storePrefix, awsRegion string) (responseApiGate
 			StatusCode: http.StatusInternalServerError,
 			Body:       fmt.Sprintf("Error: %v", err),
 		}
-		return responseApiGateway, url, nil
+		return responseApiGateway, url, err
 	}
 
 	log.Debugf("Handling init")
@@ -118,11 +112,37 @@ func Execute(log *logrus.Logger, storePrefix, awsRegion string) (responseApiGate
 			StatusCode: http.StatusInternalServerError,
 			Body:       fmt.Sprintf("Error: %v", err),
 		}
-		return responseApiGateway, url, nil
+		return responseApiGateway, url, err
 	}
 	log.Debugf("redirect url: %s", url)
 
 	return responseApiGateway, url, nil
+}
+
+func initializeVariablesFromEnv(log *logrus.Logger) (appName, environmentType, awsRegion string) {
+	//get APP_NAME from env
+	appName = os.Getenv("APPLICATION_NAME")
+	if appName == "" {
+		log.Debug("APPLICATION_NAME env variable is not set")
+		appName = defaultAppName
+	}
+	log.Debugf("APPLICATION_NAME: %s", appName)
+
+	environmentType = os.Getenv("ENVIRONMENT")
+	if environmentType == "" {
+		log.Debug("ENVIRONMENT env variable is not set")
+		environmentType = defaultEnvironmentType
+	}
+	log.Debugf("ENVIRONMENT: %s", environmentType)
+
+	awsRegion = os.Getenv("AWS_REGION")
+	if awsRegion == "" {
+		log.Debug("AWS_REGION env variable is not set")
+		awsRegion = defaultAwsRegion
+	}
+	log.Debugf("AWS_REGION: %s", awsRegion)
+
+	return appName, environmentType, awsRegion
 }
 
 func main() {
