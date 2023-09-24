@@ -3,80 +3,53 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/olegromanchuk/hotelito/internal/logging"
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/olegromanchuk/hotelito/cmd/hotelito-aws-lambda/hotelito/lambda_boilerplate"
 	"github.com/olegromanchuk/hotelito/pkg/hotel/cloudbeds"
 	"github.com/olegromanchuk/hotelito/pkg/secrets/awsstore"
 	"github.com/sirupsen/logrus"
 	"net/http"
-	"os"
-
-	"github.com/aws/aws-lambda-go/events"
-	"github.com/aws/aws-lambda-go/lambda"
+	"time"
 )
 
 func HandleCallback(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	fmt.Println(request)
-	//define logger
-	log := logrus.New()
-	// The default level is debug.
-	logLevelEnv := os.Getenv("LOG_LEVEL")
-	if logLevelEnv == "" {
-		logLevelEnv = "debug"
-	}
-	logLevel, err := logrus.ParseLevel(logLevelEnv)
+
+	fmt.Printf("[%s] Started HandleCallback", time.Now().String())
+
+	log := lambda_boilerplate.InitializeLogger()
+	log.Debug(request)
+
+	responseApiGateway, err := Execute(log, request, nil)
 	if err != nil {
-		logLevel = logrus.DebugLevel
+		log.Errorf("Error executing handler: %v", err)
+		responseApiGateway.StatusCode = http.StatusOK //we need to reply with dignity: 200 to cloudbeds
+		responseApiGateway.Body = fmt.Sprintf("Error: %v", err)
 	}
 
-	//custom formatter will add caller name to the logging
-	//generate random log record ID
-	traceID := logging.GenerateTraceID()
+	return responseApiGateway, nil
+}
 
-	if logLevel >= 5 { //Debug or Trace level
-		log.Formatter = &logging.CustomFormatter{CustomFormatter: &logrus.TextFormatter{}, TraceID: traceID}
-	}
+// Execute is the main function that handles the request
+// customAWSConfig is needed for testing to redirect AWS.SSM traffic to localstack. In production, we pass nil for customAWSConfig.
+func Execute(log *logrus.Logger, request events.APIGatewayProxyRequest, customAWSConfig *aws.Config) (responseApiGateway events.APIGatewayProxyResponse, returnError error) {
+	responseApiGateway = events.APIGatewayProxyResponse{}
 
-	log.SetLevel(logLevel)
-	log.SetOutput(os.Stdout)
-	log.Infof("Log level: %s", logLevelEnv)
-
-	//get APP_NAME from env
-	appName := os.Getenv("APPLICATION_NAME")
-	if appName == "" {
-		log.Debug("APPLICATION_NAME env variable is not set")
-		appName = "hotelito-app"
-	}
-	log.Debugf("APPLICATION_NAME: %s", appName)
-
-	environmentType := os.Getenv("ENVIRONMENT")
-	if environmentType == "" {
-		log.Debug("ENVIRONMENT env variable is not set")
-		environmentType = "dev"
-	}
-	log.Debugf("ENVIRONMENT: %s", environmentType)
-
-	awsRegion := os.Getenv("AWS_REGION")
-	if awsRegion == "" {
-		log.Debug("AWS_REGION env variable is not set")
-		awsRegion = "us-east-2"
-	}
-	log.Debugf("AWS_REGION: %s", awsRegion)
-
+	appName, environmentType, awsRegion := lambda_boilerplate.InitializeVariablesFromEnv(log)
 	storePrefix := fmt.Sprintf("%s/%s", appName, environmentType) //hotelito-app-production
+
 	//current secret store - aws env variables
-	storeClient, err := awsstore.Initialize(log, storePrefix, awsRegion)
+	storeClient, err := awsstore.Initialize(log, storePrefix, awsRegion, customAWSConfig)
 	if err != nil {
-		log.Fatal(err)
+		return responseApiGateway, err
 	}
 
 	//create cloudbeds client
 	clbClient, err := cloudbeds.NewClient4CallbackAndInit(log, storeClient)
 	if err != nil {
 		log.Errorf("Error creating cloudbeds client: %v", err)
-		return events.APIGatewayProxyResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       fmt.Sprintf("Error: %v", err),
-		}, nil
+		return responseApiGateway, err
 	}
 
 	// extract state and code from request
@@ -84,26 +57,16 @@ func HandleCallback(ctx context.Context, request events.APIGatewayProxyRequest) 
 	state := request.QueryStringParameters["state"]
 	code := request.QueryStringParameters["code"]
 
-	//option via handler interface. Helpful for testing
-	////create 3cx client
-	//pbx3cxClient := pbx3cx.New(log)
-	////define handlers
-	//h := handlers.NewHandler(log, pbx3cxClient, clbClient)
-	//err = h.Hotel.HandleOAuthCallback(state, code)
-
 	err = clbClient.HandleOAuthCallback(state, code)
 	if err != nil {
 		log.Error(err)
-		return events.APIGatewayProxyResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       fmt.Sprintf("Error: %v", err),
-		}, nil
+		return responseApiGateway, err
 	}
 
-	return events.APIGatewayProxyResponse{
-		StatusCode: http.StatusOK,
-		Body:       "Success",
-	}, nil
+	responseApiGateway.StatusCode = http.StatusOK
+	responseApiGateway.Body = "Success"
+
+	return responseApiGateway, nil
 }
 
 func main() {

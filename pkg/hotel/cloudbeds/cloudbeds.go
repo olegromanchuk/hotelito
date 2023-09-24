@@ -659,7 +659,7 @@ func (p *Cloudbeds) getVarFromStoreOrEnvironment(varName string) (result string)
 	if err != nil || result == "" {
 		result = os.Getenv(varName)
 		if err != nil {
-			p.log.Errorf("Got error while trying to get variable '%s' from environment: %s", varName, err)
+			p.log.Errorf("Got error while trying to get variable '%s' from store: %s", varName, err)
 		}
 		//obfuscate secret CLOUDBEDS_CLIENT_SECRET
 		if varName == "CLOUDBEDS_CLIENT_SECRET" {

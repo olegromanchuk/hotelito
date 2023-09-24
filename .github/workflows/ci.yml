@@ -20,6 +20,28 @@ jobs:
 
       - name: checkout
         uses: actions/checkout@v3
+
+      - name: Start LocalStack
+        run: |
+          pip install localstack awscli-local[ver1] # install LocalStack cli and awslocal
+          docker pull localstack/localstack         # Make sure to pull the latest version of the image
+          localstack start -d                       # Start LocalStack in the background
+
+          echo "Waiting for LocalStack startup..."  # Wait 30 seconds for the LocalStack container
+          localstack wait -t 30                     # to become ready before timing out
+          echo "Startup complete"
+
+      - name: Install LocalStack Waiter
+        run: pip install localstack-client
+
+      - name: Wait for LocalStack to be ready
+        run: localstack wait
+
+      - name: Run some Tests against LocalStack
+        run: |
+          awslocal s3 mb s3://test
+          awslocal s3 ls
+          echo "Test Execution complete!"
       
       - name: Get dependencies
         run: go get -v -t -d ./...

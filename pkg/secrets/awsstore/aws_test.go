@@ -509,7 +509,7 @@ func TestInitialize(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
 			// Mock session.NewSession function
-			store, err := Initialize(logger, tt.storePrefix, tt.awsRegion)
+			store, err := Initialize(logger, tt.storePrefix, tt.awsRegion, nil)
 
 			assert.Nil(t, err)
 			assert.NotNil(t, store)

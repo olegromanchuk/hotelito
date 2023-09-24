@@ -74,7 +74,7 @@ func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayPro
 
 	storePrefix := fmt.Sprintf("%s/%s", appName, environmentType) //hotelito-app-production
 	//current secret store - aws env variables
-	storeClient, err := awsstore.Initialize(log, storePrefix, awsRegion)
+	storeClient, err := awsstore.Initialize(log, storePrefix, awsRegion, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

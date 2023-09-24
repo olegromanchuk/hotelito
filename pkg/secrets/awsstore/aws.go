@@ -171,15 +171,15 @@ func (s *AWSSecretsStore) RetrieveVar(varName string) (varValue string, err erro
 	return resultString, nil
 }
 
-func Initialize(log *logrus.Logger, storePrefix string, awsRegion string) (*AWSSecretsStore, error) {
+func Initialize(log *logrus.Logger, storePrefix string, awsRegion string, customAWSConfig *aws.Config) (*AWSSecretsStore, error) {
 	accessTokenParamName := fmt.Sprintf("/%s/access_token", storePrefix)
 	refreshTokenParamName := fmt.Sprintf("/%s/refresh_token", storePrefix)
 
 	// Initialize a session that the SDK uses to load
 	// credentials from the shared credentials file. (~/.aws/credentials).
-	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String(awsRegion)},
-	)
+	awsConfig := prepareAWSConfig(awsRegion, customAWSConfig)
+
+	sess, err := session.NewSession(awsConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -194,6 +194,20 @@ func Initialize(log *logrus.Logger, storePrefix string, awsRegion string) (*AWSS
 		Log:                   log,
 		SSM:                   ssmSvc,
 	}, nil
+}
+
+func prepareAWSConfig(awsRegion string, customAWSConfig *aws.Config) (awsConfig *aws.Config) {
+	if customAWSConfig != nil {
+		awsConfig = customAWSConfig
+	} else {
+		awsConfig = &aws.Config{
+			Region: aws.String(awsRegion),
+		}
+	}
+	if awsConfig.Region == aws.String("") {
+		awsConfig.Region = aws.String(awsRegion)
+	}
+	return awsConfig
 }
 
 // Close closes the AWS session
