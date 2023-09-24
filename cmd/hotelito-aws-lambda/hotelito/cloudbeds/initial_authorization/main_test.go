@@ -1,26 +1,41 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/ssm"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"log"
 	"os"
 	"testing"
 )
 
-func TestHandleInit(t *testing.T) {
+func TestExecute(t *testing.T) {
 
-	//set env variables
-	os.Setenv("CLOUDBEDS_CLIENT_ID", "test_client_id")
-	os.Setenv("CLOUDBEDS_CLIENT_SECRET", "test_client_secret")
-	os.Setenv("CLOUDBEDS_REDIRECT_URL", "test_redirect_url")
-	os.Setenv("CLOUDBEDS_AUTH_URL", "test_auth_url")
-	os.Setenv("CLOUDBEDS_TOKEN_URL", "test_token_url")
-	os.Setenv("CLOUDBEDS_SCOPES", "test_scopes")
+	log := logrus.New()
+
+	customAWSConfig := &aws.Config{
+		Region:   aws.String("us-east-1"),
+		Endpoint: aws.String("http://localhost:4566"),
+		Credentials: credentials.NewStaticCredentials(
+			"accessKeyID",
+			"secretAccessKey",
+			"token",
+		)}
+
+	type args struct {
+		log             *logrus.Logger
+		request         events.APIGatewayProxyRequest
+		customAWSConfig *aws.Config
+	}
 
 	tests := []struct {
 		name                    string
+		args                    args
 		request                 events.APIGatewayProxyRequest
 		expected                events.APIGatewayProxyResponse
 		setEnvironmentVariables bool
@@ -29,17 +44,27 @@ func TestHandleInit(t *testing.T) {
 		hasError                bool
 	}{
 		{
-			name:    "error case: no vars are set",
+			name: "error case: no vars are set",
+			args: args{
+				log:             log,
+				request:         events.APIGatewayProxyRequest{},
+				customAWSConfig: customAWSConfig,
+			},
 			request: events.APIGatewayProxyRequest{},
 			expected: events.APIGatewayProxyResponse{
 				StatusCode: 500,
 			},
 			setEnvironmentVariables: false,
-			expectedError:           errors.New("not all required env variables are set"),
+			expectedError:           errors.New("not all required env variables are set. Missed one of"),
 			hasError:                true,
 		},
 		{
-			name:    "success case",
+			name: "success case",
+			args: args{
+				log:             log,
+				request:         events.APIGatewayProxyRequest{},
+				customAWSConfig: customAWSConfig,
+			},
 			request: events.APIGatewayProxyRequest{
 				// Populate fields as needed for this test case
 			},
@@ -72,8 +97,10 @@ func TestHandleInit(t *testing.T) {
 				os.Setenv("CLOUDBEDS_SCOPES", "test_scopes")
 			}
 
-			ctx := context.Background()
-			resp, err := HandleInit(ctx, tt.request)
+			mapOfValues := map[string]string{"state": "someRandomString"}
+			saveValuesToLocalStack(mapOfValues, tt.args.customAWSConfig)
+
+			resp, err := Execute(tt.args.log, tt.args.customAWSConfig)
 
 			if tt.hasError {
 				assert.Error(t, err)
@@ -86,4 +113,39 @@ func TestHandleInit(t *testing.T) {
 			os.Clearenv()
 		})
 	}
+}
+
+func saveValuesToLocalStack(mapOfValues map[string]string, customAWSConfig *aws.Config) {
+
+	// Initialize a session
+	sess, err := session.NewSession(customAWSConfig)
+
+	if err != nil {
+		log.Fatalf("Error creating session: %v", err)
+		return
+	}
+
+	// Create SSM service client
+	ssmSvc := ssm.New(sess)
+
+	for k, d := range mapOfValues {
+		paramName := k
+		paramValue := d
+
+		// Put the parameter
+		putParamInput := &ssm.PutParameterInput{
+			Name:      aws.String(paramName),
+			Value:     aws.String(paramValue),
+			Overwrite: aws.Bool(true), // Set to true to update existing parameter
+			Type:      aws.String("String"),
+		}
+
+		_, err = ssmSvc.PutParameter(putParamInput)
+		if err != nil {
+			log.Fatalf("Error putting SSM parameter: %v", err)
+			return
+		}
+		log.Printf("Successfully put SSM parameter %s with value %s", paramName, paramValue)
+	}
+
 }

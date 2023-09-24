@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/olegromanchuk/hotelito/cmd/hotelito-aws-lambda/hotelito/lambda_boilerplate"
 	"github.com/olegromanchuk/hotelito/internal/handlers"
 	"github.com/olegromanchuk/hotelito/pkg/hotel/cloudbeds"
@@ -21,7 +23,7 @@ func HandleInit(ctx context.Context, request events.APIGatewayProxyRequest) (eve
 	log := lambda_boilerplate.InitializeLogger()
 	log.Debug(request)
 
-	responseApiGateway, err := Execute(log)
+	responseApiGateway, err := Execute(log, nil)
 	if err != nil {
 		log.Errorf("Error executing handler: %v", err)
 		return events.APIGatewayProxyResponse{
@@ -33,16 +35,16 @@ func HandleInit(ctx context.Context, request events.APIGatewayProxyRequest) (eve
 	return responseApiGateway, nil
 }
 
-func Execute(log *logrus.Logger) (responseApiGateway events.APIGatewayProxyResponse, returnError error) {
+func Execute(log *logrus.Logger, customAWSConfig *aws.Config) (responseApiGateway events.APIGatewayProxyResponse, returnError error) {
 
 	appName, environmentType, awsRegion := lambda_boilerplate.InitializeVariablesFromEnv(log)
 	storePrefix := fmt.Sprintf("%s/%s", appName, environmentType) //hotelito-app-production
 
 	//Initialize current secret store - aws env variables
-	storeClient, err := awsstore.Initialize(log, storePrefix, awsRegion, nil)
+	storeClient, err := awsstore.Initialize(log, storePrefix, awsRegion, customAWSConfig)
 	if err != nil {
 		errMsg := fmt.Sprintf("error initializing AWS SSM store with store prefix %s in region %s. Error: %v", storePrefix, awsRegion, err)
-		log.Fatal(errMsg)
+		return responseApiGateway, errors.New(errMsg)
 	}
 
 	storeClient.Log = log //set logger for store client

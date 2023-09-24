@@ -20,7 +20,7 @@ func TestExecute(t *testing.T) {
 	request := events.APIGatewayProxyRequest{}
 
 	customAWSConfig := &aws.Config{
-		Region:   aws.String(os.Getenv("AWS_REGION")),
+		Region:   aws.String("us-east-1"),
 		Endpoint: aws.String("http://localhost:4566"),
 		Credentials: credentials.NewStaticCredentials(
 			"accessKeyID",
