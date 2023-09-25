@@ -1,18 +1,36 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ssm"
+	"github.com/olegromanchuk/hotelito/cmd/hotelito-aws-lambda/hotelito/localstacktest"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"log"
 	"os"
 	"testing"
 )
+
+func TestMain(m *testing.M) {
+	ctx := context.Background()
+	if err := localstacktest.StartLocalStack(ctx); err != nil {
+		panic(err)
+	}
+
+	// run tests
+	code := m.Run()
+
+	if err := localstacktest.StopLocalStack(ctx); err != nil {
+		panic(err)
+	}
+
+	os.Exit(code)
+}
 
 func TestExecute(t *testing.T) {
 
