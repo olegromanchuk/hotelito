@@ -177,7 +177,7 @@ func Initialize(log *logrus.Logger, storePrefix string, awsRegion string, custom
 
 	// Initialize a session that the SDK uses to load
 	// credentials from the shared credentials file. (~/.aws/credentials).
-	awsConfig := prepareAWSConfig(awsRegion, customAWSConfig)
+	awsConfig := PrepareAWSConfig(awsRegion, customAWSConfig)
 
 	sess, err := session.NewSession(awsConfig)
 	if err != nil {
@@ -196,7 +196,7 @@ func Initialize(log *logrus.Logger, storePrefix string, awsRegion string, custom
 	}, nil
 }
 
-func prepareAWSConfig(awsRegion string, customAWSConfig *aws.Config) (awsConfig *aws.Config) {
+func PrepareAWSConfig(awsRegion string, customAWSConfig *aws.Config) (awsConfig *aws.Config) {
 	if customAWSConfig != nil {
 		awsConfig = customAWSConfig
 	} else {

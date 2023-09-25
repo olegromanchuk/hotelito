@@ -5,7 +5,7 @@ set -o errexit
 ORIGINAL_FILE_3CX=../../3cx/src/crm-template-cloudbeds-3cx-template.xml
 FINAL_FILE_3CX=../../3cx/crm-template-cloudbeds-3cx.xml
 FILE_ROOMID_EXTENSION_MAP=../../config.json
-FILE_3CX_API_CONF=../../cloudbeds_api_v1.2_params.json
+FILE_3CX_API_CONF=../../cloudbeds_api_params.json
 
 # if samconfig.toml doesn't exist - advise to run sam deploy --guided first
 if [ ! -f samconfig.toml ]; then

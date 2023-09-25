@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/olegromanchuk/hotelito/cmd/hotelito-aws-lambda/hotelito/localstacktest"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -38,22 +35,8 @@ func TestExecute(t *testing.T) {
 	log := logrus.New()
 	request := events.APIGatewayProxyRequest{}
 
-	//get localstack config from env variables
-	localstack_host := os.Getenv("LOCALSTACK_HOST")
-	localstack_port := os.Getenv("LOCALSTACK_PORT")
-	if localstack_host == "" || localstack_port == "" {
-		log.Fatalf("💩🤷 Error getting localstack host and port from env variables. Check localstacktest.go and TestMain()")
-		return
-	}
-
-	customAWSConfig := &aws.Config{
-		Region:   aws.String("us-east-1"),
-		Endpoint: aws.String(fmt.Sprintf("http://%s:%s", localstack_host, localstack_port)),
-		Credentials: credentials.NewStaticCredentials(
-			"accessKeyID",
-			"secretAccessKey",
-			"token",
-		)}
+	//get customAWSConfig from localstacktest
+	customAWSConfig := localstacktest.GetCustomAWSConfig()
 
 	// Create the APIGatewayProxyRequest object
 	requestWState := events.APIGatewayProxyRequest{
@@ -151,7 +134,7 @@ func TestExecute(t *testing.T) {
 
 			if tt.setupLocalStack {
 				mapOfValues := map[string]string{"state": "someRandomString"}
-				saveValuesToLocalStack(mapOfValues, tt.args.customAWSConfig)
+				localstacktest.SaveValuesToLocalStack(mapOfValues, tt.args.customAWSConfig)
 			}
 
 			gotResponseApiGateway, err := Execute(tt.args.log, tt.args.request, tt.args.customAWSConfig)
@@ -166,39 +149,4 @@ func TestExecute(t *testing.T) {
 			os.Clearenv()
 		})
 	}
-}
-
-func saveValuesToLocalStack(mapOfValues map[string]string, customAWSConfig *aws.Config) {
-
-	// Initialize a session
-	sess, err := session.NewSession(customAWSConfig)
-
-	if err != nil {
-		log.Fatalf("Error creating session: %v", err)
-		return
-	}
-
-	// Create SSM service client
-	ssmSvc := ssm.New(sess)
-
-	for k, d := range mapOfValues {
-		paramName := k
-		paramValue := d
-
-		// Put the parameter
-		putParamInput := &ssm.PutParameterInput{
-			Name:      aws.String(paramName),
-			Value:     aws.String(paramValue),
-			Overwrite: aws.Bool(true), // Set to true to update existing parameter
-			Type:      aws.String("String"),
-		}
-
-		_, err = ssmSvc.PutParameter(putParamInput)
-		if err != nil {
-			log.Fatalf("Error putting SSM parameter: %v", err)
-			return
-		}
-		log.Printf("Successfully put SSM parameter %s with value %s", paramName, paramValue)
-	}
-
 }
