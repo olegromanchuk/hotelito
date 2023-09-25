@@ -2,11 +2,13 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ssm"
+	"github.com/olegromanchuk/hotelito/cmd/hotelito-aws-lambda/hotelito/localstacktest"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"log"
@@ -14,14 +16,39 @@ import (
 	"testing"
 )
 
+func TestMain(m *testing.M) {
+	if err := localstacktest.StartLocalStack(); err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("🧪🚀 Tests started: oauth2\n")
+	// run tests
+	code := m.Run()
+	fmt.Printf("🧪✅ Tests finished oauth2\n")
+
+	// Terminate LocalStack if this is the last package
+	if err := localstacktest.StopLocalStack(); err != nil {
+		log.Fatalf("Could not terminate LocalStack: %v", err)
+	}
+	os.Exit(code)
+}
+
 func TestExecute(t *testing.T) {
 
 	log := logrus.New()
 	request := events.APIGatewayProxyRequest{}
 
+	//get localstack config from env variables
+	localstack_host := os.Getenv("LOCALSTACK_HOST")
+	localstack_port := os.Getenv("LOCALSTACK_PORT")
+	if localstack_host == "" || localstack_port == "" {
+		log.Fatalf("💩🤷 Error getting localstack host and port from env variables. Check localstacktest.go and TestMain()")
+		return
+	}
+
 	customAWSConfig := &aws.Config{
 		Region:   aws.String("us-east-1"),
-		Endpoint: aws.String("http://localhost:4566"),
+		Endpoint: aws.String(fmt.Sprintf("http://%s:%s", localstack_host, localstack_port)),
 		Credentials: credentials.NewStaticCredentials(
 			"accessKeyID",
 			"secretAccessKey",

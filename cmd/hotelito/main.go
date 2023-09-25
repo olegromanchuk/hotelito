@@ -130,7 +130,7 @@ func runServer(envFileName string, log *logrus.Logger, quit chan struct{}) {
 	server := &http.Server{Addr: port}
 
 	go func() {
-		log.Printf("Starting server on port %s", port)
+		log.Printf("✅ Starting server on port %s", port)
 		if err := server.ListenAndServe(); err != http.ErrServerClosed {
 			log.Fatalf("Server failed: %v", err)
 		}

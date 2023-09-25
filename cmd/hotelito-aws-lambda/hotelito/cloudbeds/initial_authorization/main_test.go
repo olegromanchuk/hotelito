@@ -1,8 +1,8 @@
 package main
 
 import (
-	"context"
 	"errors"
+	"fmt"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -17,18 +17,19 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	ctx := context.Background()
-	if err := localstacktest.StartLocalStack(ctx); err != nil {
+	if err := localstacktest.StartLocalStack(); err != nil {
 		panic(err)
 	}
 
+	fmt.Printf("🧪🚀 Tests started init_auth\n")
 	// run tests
 	code := m.Run()
+	fmt.Printf("🧪✅ Tests finished init_auth\n")
 
-	if err := localstacktest.StopLocalStack(ctx); err != nil {
-		panic(err)
+	// Terminate LocalStack if this is the last package
+	if err := localstacktest.StopLocalStack(); err != nil {
+		log.Fatalf("Could not terminate LocalStack: %v", err)
 	}
-
 	os.Exit(code)
 }
 
@@ -36,9 +37,17 @@ func TestExecute(t *testing.T) {
 
 	log := logrus.New()
 
+	//get localstack config from env variables
+	localstack_host := os.Getenv("LOCALSTACK_HOST")
+	localstack_port := os.Getenv("LOCALSTACK_PORT")
+	if localstack_host == "" || localstack_port == "" {
+		log.Fatalf("💩🤷 Error getting localstack host and port from env variables. Check localstacktest.go and TestMain()")
+		return
+	}
+
 	customAWSConfig := &aws.Config{
 		Region:   aws.String("us-east-1"),
-		Endpoint: aws.String("http://localhost:4566"),
+		Endpoint: aws.String(fmt.Sprintf("http://%s:%s", localstack_host, localstack_port)),
 		Credentials: credentials.NewStaticCredentials(
 			"accessKeyID",
 			"secretAccessKey",

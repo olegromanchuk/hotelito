@@ -17,13 +17,13 @@ release:
 	goreleaser --snapshot --skip-publish --clean
 
 test:
-	docker run -d --name localstacktestt --rm -it -p 4566:4566 localstack/localstack
+	#docker run -d --name localstacktestt --rm -it -p 4566:4566 localstack/localstack
 	go clean -testcache
 	go test -race -coverprofile=profile.cov ./...
 	go tool cover -func=profile.cov
 	rm profile.cov
 	golangci-lint run
-	docker stop localstacktestt
+	#docker stop localstacktestt
 
 version:
 	@echo "branch: $(BRANCH), hash: $(HASH), timestamp: $(TIMESTAMP)"

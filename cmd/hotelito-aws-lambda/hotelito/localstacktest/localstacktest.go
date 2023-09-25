@@ -5,60 +5,58 @@ import (
 	"fmt"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/localstack"
-	"io"
 	"os"
 	"sync"
+	"sync/atomic"
 )
 
 var (
 	once                sync.Once
-	localStackContainer testcontainers.Container
+	localstackContainer testcontainers.Container
+	testPackagesCounter int32
+	ctx                 context.Context
 )
 
-func StartLocalStack(ctx context.Context) error {
-	var err error
+func StartLocalStack() error {
 	once.Do(func() {
+		var err error
+		ctx = context.Background() //not really used. We rely on CI/CD to clean up containers
 
-		ctx := context.Background()
-
-		localstackContainer, err := localstack.RunContainer(ctx,
+		localstackContainer, err = localstack.RunContainer(ctx,
 			testcontainers.WithImage("localstack/localstack:1.4.0"),
 		)
 		if err != nil {
 			panic(err)
 		}
 
-		logs, _ := localstackContainer.Logs(ctx)
-		fmt.Printf("🧚 ")
-		io.Copy(os.Stdout, logs)
+		host, err := localstackContainer.Host(ctx)
+		if err != nil {
+			fmt.Println("Error fetching container host:", err)
+			return
+		}
 
-		// Clean up the container
-		defer func() {
-			if err := localstackContainer.Terminate(ctx); err != nil {
-				panic(err)
-			}
-		}()
+		port, err := localstackContainer.MappedPort(ctx, "4566")
+		if err != nil {
+			fmt.Println("Error fetching container port:", err)
+			return
+		}
 
-		//req := testcontainers.ContainerRequest{
-		//	Image:        "localstack/localstack",
-		//	ExposedPorts: []string{"4566/tcp"},
-		//	WaitingFor:   wait.ForLog("Ready."),
-		//	Env: map[string]string{
-		//		"SERVICES":       "s3,dynamodb",
-		//		"DEFAULT_REGION": "us-east-1",
-		//		"DEBUG":          "1",
-		//		"DATA_DIR":       "/tmp/localstack/data",
-		//	},
-		//}
-		//
-		//localStackContainer, err = testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		//	ContainerRequest: req,
-		//	Started:          true,
-		//})
+		fmt.Printf("🔥🔥🔥 Localstack is running on %s:%s 🔥🔥🔥\n", host, port.Port())
+		// Now you can connect to LocalStack on this host and port.
+
+		//set env vars with host and port of localstack. Will be used later in tests
+		os.Setenv("LOCALSTACK_HOST", host)
+		os.Setenv("LOCALSTACK_PORT", string(port))
+
 	})
-	return err
+	atomic.AddInt32(&testPackagesCounter, 1)
+	return nil
 }
 
-func StopLocalStack(ctx context.Context) error {
-	return localStackContainer.Terminate(ctx)
+func StopLocalStack() error {
+	newCounterValue := atomic.AddInt32(&testPackagesCounter, -1)
+	if newCounterValue == 0 {
+		return localstackContainer.Terminate(ctx)
+	}
+	return nil
 }
