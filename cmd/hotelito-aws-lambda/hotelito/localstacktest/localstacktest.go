@@ -36,8 +36,9 @@ func GetCustomAWSConfig() *aws.Config {
 	}
 
 	customAWSConfig := &aws.Config{
-		Region:   aws.String("us-east-1"),
-		Endpoint: aws.String(fmt.Sprintf("http://%s:%s", localstack_host, localstack_port)),
+		Region:           aws.String("us-east-1"),
+		Endpoint:         aws.String(fmt.Sprintf("http://%s:%s", localstack_host, localstack_port)),
+		S3ForcePathStyle: aws.Bool(true),
 		Credentials: credentials.NewStaticCredentials(
 			"accessKeyID",
 			"secretAccessKey",
@@ -252,7 +253,6 @@ func ClearLocalstackSSMStore(awsCustomConfig *aws.Config) {
 }
 
 func CreateFileInS3(awsCustomConfig *aws.Config, bucketName string, fileName string) {
-	awsCustomConfig.S3ForcePathStyle = aws.Bool(true)
 	sess, err := session.NewSession(awsCustomConfig)
 
 	if err != nil {

@@ -80,7 +80,7 @@ func TestExecute(t *testing.T) {
 		expectedErrorContains        error
 	}{
 		{
-			name: "error: AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID is not set at all",
+			name: "test1. Error: AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID is not set at all",
 			args: args{
 				log:             log,
 				request:         emptyRequest,
@@ -94,7 +94,7 @@ func TestExecute(t *testing.T) {
 		},
 
 		{
-			name: "error: AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID is not set in env but set in store",
+			name: "test2. Error: AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID is not set in env but set in store. NoSuchBucket",
 			args: args{
 				log:             log,
 				request:         emptyRequest,
@@ -109,18 +109,18 @@ func TestExecute(t *testing.T) {
 		},
 
 		{
-			name: "error: AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID is set",
+			name: "test3. Error: AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID is set",
 			args: args{
 				log:             log,
 				request:         emptyRequest,
 				customAWSConfig: customAWSConfig,
 			},
-			setEnvironmentVariables:      true,
+			setEnvironmentVariables:      false,
 			setVarsInLocalStack:          true,
 			createFileInS3BucketFileName: map[string]string{awsBucketName: "config.json"},
 			wantResponseApiGateway: events.APIGatewayProxyResponse{
 				StatusCode: 500,
-				Body:       "failed to fetch object: Unable to download item \"cloudbeds_api_params.json\", NoSuchBucket: The specified bucket does not exist\n\tstatus code: 404",
+				Body:       "failed to fetch object: Unable to download item \"cloudbeds_api_params.json\", NoSuchKey: The specified key does not exist.\n\tstatus code: 404",
 			},
 		},
 	}
@@ -144,7 +144,7 @@ func TestExecute(t *testing.T) {
 			}
 
 			if tt.setVarsInLocalStack {
-				mapOfValues := map[string]string{"AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID": "test_bucket"}
+				mapOfValues := map[string]string{"AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID": awsBucketName}
 				localstacktest.SaveValuesToLocalStack(mapOfValues, tt.args.customAWSConfig)
 			}
 			if len(tt.createFileInS3BucketFileName) > 0 {
