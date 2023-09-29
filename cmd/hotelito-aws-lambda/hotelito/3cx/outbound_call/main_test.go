@@ -12,8 +12,9 @@ import (
 	"testing"
 )
 
-var useDockerLocalstack = true //use docker for localstack for local debugging
+var useDockerLocalstack = false //use docker for localstack for fast local debugging
 // docker run -d --name localstacktestt --rm -it -p 4566:4566 localstack/localstack
+//otherwise localstack is started automatically when tests run
 
 func TestMain(m *testing.M) {
 
