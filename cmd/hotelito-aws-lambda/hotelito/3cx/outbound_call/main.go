@@ -98,7 +98,10 @@ func Execute(log *logrus.Logger, request events.APIGatewayProxyRequest, customAW
 	//parse config.json
 	configMap, err := configuration.New(log, mapFullFileName, clBedsApiConfigFile)
 	if err != nil {
-		log.Fatal(err) //TODO: add error handling. Try to load previous version of configMap
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       err.Error(),
+		}, nil
 	}
 
 	//create cloudbeds client

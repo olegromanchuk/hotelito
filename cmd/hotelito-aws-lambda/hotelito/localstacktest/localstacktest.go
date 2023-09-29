@@ -252,7 +252,7 @@ func ClearLocalstackSSMStore(awsCustomConfig *aws.Config) {
 	}
 }
 
-func CreateFileInS3(awsCustomConfig *aws.Config, bucketName string, fileName string) {
+func CreateFilesInS3(awsCustomConfig *aws.Config, bucketName string, fileNames []string) {
 	sess, err := session.NewSession(awsCustomConfig)
 
 	if err != nil {
@@ -264,7 +264,6 @@ func CreateFileInS3(awsCustomConfig *aws.Config, bucketName string, fileName str
 
 	// Define bucket and file name
 	bucketName = bucketName
-	fileName = fileName
 
 	// Check if bucket exists
 	input := &s3.HeadBucketInput{
@@ -282,15 +281,19 @@ func CreateFileInS3(awsCustomConfig *aws.Config, bucketName string, fileName str
 		log.Printf("Bucket %s created.", bucketName)
 	}
 
-	// Create empty JSON file and upload
-	_, err = s3Client.PutObject(&s3.PutObjectInput{
-		Body:   aws.ReadSeekCloser(bytes.NewReader([]byte("{}"))),
-		Bucket: aws.String(bucketName),
-		Key:    aws.String(fileName),
-	})
-	if err != nil {
-		log.Fatalf("Failed to upload file: %v", err)
-	} else {
-		log.Printf("Successfully created empty file %s in bucket %s", fileName, bucketName)
+	for _, fileName := range fileNames {
+		fileName = fileName
+
+		// Create empty JSON file and upload
+		_, err = s3Client.PutObject(&s3.PutObjectInput{
+			Body:   aws.ReadSeekCloser(bytes.NewReader([]byte("{}"))),
+			Bucket: aws.String(bucketName),
+			Key:    aws.String(fileName),
+		})
+		if err != nil {
+			log.Fatalf("Failed to upload file: %v", err)
+		} else {
+			log.Printf("Successfully created empty file %s in bucket %s", fileName, bucketName)
+		}
 	}
 }

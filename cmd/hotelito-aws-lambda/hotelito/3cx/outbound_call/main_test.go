@@ -22,7 +22,7 @@ func TestMain(m *testing.M) {
 		os.Setenv("LOCALSTACK_PORT", "4566")
 		err := localstacktest.CheckLocalStackHealth()
 		if err != nil {
-			errMsg := fmt.Sprintf("useDockerLocalstack is set to true, but localstack is not running. Please start localstack with `docker run -d --name localstacktestt --rm -it -p 4566:4566 localstack/localstack` or set useDockerLocalstack to false. Error: %s", err)
+			errMsg := fmt.Sprintf("useDockerLocalstack is set to true, but localstack is not running. Please start localstack with `docker run -d --name localstacktest --rm -it -p 4566:4566 localstack/localstack` or set useDockerLocalstack to false. Error: %s", err)
 			panic(errMsg)
 		}
 		code := m.Run()
@@ -75,7 +75,7 @@ func TestExecute(t *testing.T) {
 		setEnvironmentVariables      bool
 		setVarsInLocalStack          bool
 		expectedStatusCode           int
-		createFileInS3BucketFileName map[string]string
+		createFileInS3BucketFileName []string
 		wantResponseApiGateway       events.APIGatewayProxyResponse
 		expectedErrorContains        error
 	}{
@@ -109,7 +109,7 @@ func TestExecute(t *testing.T) {
 		},
 
 		{
-			name: "test3. Error: AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID is set",
+			name: "test3. Error: AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID is set, but cloudbeds_api_params.json is not available in S3 bucket",
 			args: args{
 				log:             log,
 				request:         emptyRequest,
@@ -117,7 +117,23 @@ func TestExecute(t *testing.T) {
 			},
 			setEnvironmentVariables:      false,
 			setVarsInLocalStack:          true,
-			createFileInS3BucketFileName: map[string]string{awsBucketName: "config.json"},
+			createFileInS3BucketFileName: []string{"config.json"},
+			wantResponseApiGateway: events.APIGatewayProxyResponse{
+				StatusCode: 500,
+				Body:       "failed to fetch object: Unable to download item \"cloudbeds_api_params.json\", NoSuchKey: The specified key does not exist.\n\tstatus code: 404",
+			},
+		},
+
+		{
+			name: "test4. Error: AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID is set",
+			args: args{
+				log:             log,
+				request:         emptyRequest,
+				customAWSConfig: customAWSConfig,
+			},
+			setEnvironmentVariables:      false,
+			setVarsInLocalStack:          true,
+			createFileInS3BucketFileName: []string{"config.json", "cloudbeds_api_params.json"},
 			wantResponseApiGateway: events.APIGatewayProxyResponse{
 				StatusCode: 500,
 				Body:       "failed to fetch object: Unable to download item \"cloudbeds_api_params.json\", NoSuchKey: The specified key does not exist.\n\tstatus code: 404",
@@ -148,7 +164,7 @@ func TestExecute(t *testing.T) {
 				localstacktest.SaveValuesToLocalStack(mapOfValues, tt.args.customAWSConfig)
 			}
 			if len(tt.createFileInS3BucketFileName) > 0 {
-				localstacktest.CreateFileInS3(tt.args.customAWSConfig, awsBucketName, tt.createFileInS3BucketFileName[awsBucketName])
+				localstacktest.CreateFilesInS3(tt.args.customAWSConfig, awsBucketName, tt.createFileInS3BucketFileName)
 			}
 
 			gotResponseApiGateway, _ := Execute(tt.args.log, tt.args.request, tt.args.customAWSConfig)
