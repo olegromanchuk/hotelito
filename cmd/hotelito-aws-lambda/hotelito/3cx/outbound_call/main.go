@@ -82,7 +82,7 @@ func Execute(log *logrus.Logger, request events.APIGatewayProxyRequest, customAW
 		}, nil
 	}
 
-	log.Debugf("Fetching config.json from S3 bucket %s", awsBucketName)
+	log.Debugf("Fetching cloudbeds_api_params.json from S3 bucket %s", awsBucketName)
 	//get information about mapping: room extension -- cloudbeds room ID
 	//fetchS3ObjectAndSaveToFile is a helper function to fetch object from S3 and save it to file
 	clBedsApiConfigFile, err := fetchS3ObjectAndSaveToFile(log, awsBucketName, "cloudbeds_api_params.json", awsRegion, customAWSConfig) // Replace with your bucket name and the file name
@@ -181,7 +181,7 @@ func Execute(log *logrus.Logger, request events.APIGatewayProxyRequest, customAW
 func fetchS3ObjectAndSaveToFile(log *logrus.Logger, bucket, fileName string, awsRegion string, customAWSConfig *aws.Config) (filename string, err error) {
 
 	awsConfig := awsstore.PrepareAWSConfig(awsRegion, customAWSConfig)
-
+	fullFileName := fmt.Sprintf("/tmp/%s", fileName)
 	sess, err := session.NewSession(awsConfig)
 
 	if err != nil {
@@ -190,7 +190,7 @@ func fetchS3ObjectAndSaveToFile(log *logrus.Logger, bucket, fileName string, aws
 
 	downloader := s3manager.NewDownloader(sess)
 	log.Tracef("Downloading %s from bucket %s", fileName, bucket)
-	file, err := os.Create("/tmp/config.json") //save file to current directory. Exists only for current lambda execution
+	file, err := os.Create(fullFileName) //save file to current directory. Exists only for current lambda execution
 	if err != nil {
 		errMsg := fmt.Sprintf("Unable to open file %q for writing - %v", fileName, err)
 		log.Error(errMsg)
@@ -209,7 +209,6 @@ func fetchS3ObjectAndSaveToFile(log *logrus.Logger, bucket, fileName string, aws
 		log.Error(errMsg)
 		return "", errors.New(errMsg)
 	}
-	fullFileName := fmt.Sprintf("/tmp/%s", fileName)
 	log.Tracef("Stored to %s from bucket %s, %d bytes", fullFileName, bucket, bytesDownloaded)
 	return fullFileName, nil
 }

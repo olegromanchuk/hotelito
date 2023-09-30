@@ -96,7 +96,7 @@ func CheckLocalStackHealth() error {
 	localstack_host := os.Getenv("LOCALSTACK_HOST")
 	localstack_port := os.Getenv("LOCALSTACK_PORT")
 	if localstack_host == "" || localstack_port == "" {
-		errMsg := "💩🤷 Error getting localstack host and port from env variables. Check localstacktest.go and TestMain()"
+		errMsg := "💩🤷 Error getting localstack host and port from env variables. Check localstacktest.go:CheckLocalStackHealth and TestMain()"
 		return errors.New(errMsg)
 	}
 	address := fmt.Sprintf("%s:%s", localstack_host, localstack_port)
