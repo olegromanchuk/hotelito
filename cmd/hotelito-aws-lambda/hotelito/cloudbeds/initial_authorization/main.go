@@ -2,82 +2,62 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/olegromanchuk/hotelito/cmd/hotelito-aws-lambda/hotelito/lambda_boilerplate"
 	"github.com/olegromanchuk/hotelito/internal/handlers"
-	"github.com/olegromanchuk/hotelito/internal/logging"
 	"github.com/olegromanchuk/hotelito/pkg/hotel/cloudbeds"
 	"github.com/olegromanchuk/hotelito/pkg/pbx/pbx3cx"
 	"github.com/olegromanchuk/hotelito/pkg/secrets/awsstore"
 	"github.com/sirupsen/logrus"
 	"net/http"
-	"os"
+	"time"
 )
 
 func HandleInit(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	fmt.Println(request)
-	//define logger
-	log := logrus.New()
+	fmt.Printf("[%s] Started HandleInit", time.Now().String())
 
-	// The default level is debug.
-	logLevelEnv := os.Getenv("LOG_LEVEL")
-	if logLevelEnv == "" {
-		logLevelEnv = "debug"
-	}
-	logLevel, err := logrus.ParseLevel(logLevelEnv)
+	log := lambda_boilerplate.InitializeLogger()
+	log.Debug(request)
+
+	responseApiGateway, err := Execute(log, nil)
 	if err != nil {
-		logLevel = logrus.DebugLevel
+		log.Errorf("Error executing handler: %v", err)
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       fmt.Sprintf("Error: %v", err),
+		}, err
 	}
 
-	//custom formatter will add caller name to the logging
-	traceID := logging.GenerateTraceID()
-	if logLevel >= 5 { //Debug or Trace level
-		log.Formatter = &logging.CustomFormatter{CustomFormatter: &logrus.TextFormatter{}, TraceID: traceID}
-	}
+	return responseApiGateway, nil
+}
 
-	log.SetLevel(logLevel)
-	log.SetOutput(os.Stdout)
-	log.Infof("Log level: %s", logLevelEnv)
+func Execute(log *logrus.Logger, customAWSConfig *aws.Config) (responseApiGateway events.APIGatewayProxyResponse, returnError error) {
 
-	//get APP_NAME from env
-	appName := os.Getenv("APPLICATION_NAME")
-	if appName == "" {
-		log.Debug("APPLICATION_NAME env variable is not set")
-		appName = "hotelito-app"
-	}
-	log.Debugf("APPLICATION_NAME: %s", appName)
-
-	environmentType := os.Getenv("ENVIRONMENT")
-	if environmentType == "" {
-		log.Debug("ENVIRONMENT env variable is not set")
-		environmentType = "dev"
-	}
-	log.Debugf("ENVIRONMENT: %s", environmentType)
-
-	awsRegion := os.Getenv("AWS_REGION")
-	if awsRegion == "" {
-		log.Debug("AWS_REGION env variable is not set")
-		awsRegion = "us-east-2"
-	}
-	log.Debugf("AWS_REGION: %s", awsRegion)
-
+	appName, environmentType, awsRegion := lambda_boilerplate.InitializeVariablesFromEnv(log)
 	storePrefix := fmt.Sprintf("%s/%s", appName, environmentType) //hotelito-app-production
-	//current secret store - aws env variables
-	storeClient, err := awsstore.Initialize(log, storePrefix, awsRegion)
+
+	//Initialize current secret store - aws env variables
+	storeClient, err := awsstore.Initialize(log, storePrefix, awsRegion, customAWSConfig)
 	if err != nil {
-		log.Fatal(err)
+		errMsg := fmt.Sprintf("error initializing AWS SSM store with store prefix %s in region %s. Error: %v", storePrefix, awsRegion, err)
+		return responseApiGateway, errors.New(errMsg)
 	}
+
 	storeClient.Log = log //set logger for store client
 
 	//create cloudbeds client
 	clbClient, err := cloudbeds.NewClient4CallbackAndInit(log, storeClient)
 	if err != nil {
 		log.Errorf("Error creating cloudbeds client: %v", err)
-		return events.APIGatewayProxyResponse{
+		responseApiGateway = events.APIGatewayProxyResponse{
 			StatusCode: http.StatusInternalServerError,
 			Body:       fmt.Sprintf("Error: %v", err),
-		}, nil
+		}
+		return responseApiGateway, err
 	}
 
 	log.Debugf("Handling init")
@@ -90,19 +70,20 @@ func HandleInit(ctx context.Context, request events.APIGatewayProxyRequest) (eve
 	url, err := h.Hotel.HandleInitialLogin()
 	if err != nil {
 		log.Error(err)
-		return events.APIGatewayProxyResponse{
+		responseApiGateway = events.APIGatewayProxyResponse{
 			StatusCode: http.StatusInternalServerError,
 			Body:       fmt.Sprintf("Error: %v", err),
-		}, nil
+		}
+		return responseApiGateway, err
 	}
 	log.Debugf("redirect url: %s", url)
 
-	return events.APIGatewayProxyResponse{
-		StatusCode: http.StatusFound,
-		Headers: map[string]string{
-			"Location": url,
-		},
-	}, nil
+	responseApiGateway.StatusCode = http.StatusFound
+	responseApiGateway.Headers = map[string]string{
+		"Location": url,
+	}
+
+	return responseApiGateway, nil
 }
 
 func main() {

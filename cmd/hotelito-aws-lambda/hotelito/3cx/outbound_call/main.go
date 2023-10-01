@@ -10,9 +10,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/olegromanchuk/hotelito/cmd/hotelito-aws-lambda/hotelito/lambda_boilerplate"
 	"github.com/olegromanchuk/hotelito/internal/configuration"
 	"github.com/olegromanchuk/hotelito/internal/handlers"
-	"github.com/olegromanchuk/hotelito/internal/logging"
 	"github.com/olegromanchuk/hotelito/pkg/hotel/cloudbeds"
 	"github.com/olegromanchuk/hotelito/pkg/pbx/pbx3cx"
 	"github.com/olegromanchuk/hotelito/pkg/secrets/awsstore"
@@ -20,63 +20,37 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 )
 
 func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	fmt.Println(request)
-	//define logger
-	log := logrus.New()
-	// The default level is debug.
-	logLevelEnv := os.Getenv("LOG_LEVEL")
-	if logLevelEnv == "" {
-		logLevelEnv = "debug"
-	}
-	logLevel, err := logrus.ParseLevel(logLevelEnv)
+
+	fmt.Printf("[%s] Started HandleProcessOutboundCall", time.Now().String())
+
+	log := lambda_boilerplate.InitializeLogger()
+	log.Debug(request)
+
+	responseApiGateway, err := Execute(log, request, nil)
 	if err != nil {
-		logLevel = logrus.DebugLevel
+		log.Errorf("Error executing handler: %v", err)
+		responseApiGateway.StatusCode = http.StatusOK //we need to reply with dignity: 200 to cloudbeds
+		responseApiGateway.Body = fmt.Sprintf("Error: %v", err)
 	}
 
-	//custom formatter will add caller name to the logging
-	traceID := request.RequestContext.RequestID
+	return responseApiGateway, nil
+}
 
-	if logLevel >= 5 { //Debug or Trace level
-		log.Formatter = &logging.CustomFormatter{CustomFormatter: &logrus.TextFormatter{}, TraceID: traceID}
-	}
-
-	log.SetLevel(logLevel)
-	log.SetOutput(os.Stdout)
-	log.Infof("Log level: %s", logLevelEnv)
-
-	//get APP_NAME from env
-	appName := os.Getenv("APPLICATION_NAME")
-	if appName == "" {
-		log.Debug("APPLICATION_NAME env variable is not set")
-		appName = "hotelito-app"
-	}
-	log.Debugf("APPLICATION_NAME: %s", appName)
-
-	environmentType := os.Getenv("ENVIRONMENT")
-	if environmentType == "" {
-		log.Debug("ENVIRONMENT env variable is not set")
-		environmentType = "dev"
-	}
-	log.Debugf("ENVIRONMENT: %s", environmentType)
-
-	awsRegion := os.Getenv("AWS_REGION")
-	if awsRegion == "" {
-		log.Debug("AWS_REGION env variable is not set")
-		awsRegion = "us-east-2"
-	}
-	log.Debugf("AWS_REGION: %s", awsRegion)
-
+func Execute(log *logrus.Logger, request events.APIGatewayProxyRequest, customAWSConfig *aws.Config) (responseApiGateway events.APIGatewayProxyResponse, returnError error) {
+	appName, environmentType, awsRegion := lambda_boilerplate.InitializeVariablesFromEnv(log)
 	storePrefix := fmt.Sprintf("%s/%s", appName, environmentType) //hotelito-app-production
+
 	//current secret store - aws env variables
-	storeClient, err := awsstore.Initialize(log, storePrefix, awsRegion)
+	storeClient, err := awsstore.Initialize(log, storePrefix, awsRegion, customAWSConfig)
 	if err != nil {
-		log.Fatal(err)
+		return responseApiGateway, err
 	}
 
 	awsBucketName := os.Getenv("AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID")
@@ -98,7 +72,7 @@ func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayPro
 	log.Debugf("Fetching config.json from S3 bucket %s", awsBucketName)
 	//get information about mapping: room extension -- cloudbeds room ID
 	//fetchS3ObjectAndSaveToFile is a helper function to fetch object from S3 and save it to file
-	mapFullFileName, err := fetchS3ObjectAndSaveToFile(log, awsBucketName, "config.json") // Replace with your bucket name and the file name
+	mapFullFileName, err := fetchS3ObjectAndSaveToFile(log, awsBucketName, "config.json", awsRegion, customAWSConfig) // Replace with your bucket name and the file name
 	if err != nil || mapFullFileName == "" {
 		errMsg := fmt.Sprintf("failed to fetch object: %v. Check if AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID is set and S3 bucket with config.json exists", err)
 		log.Error(errMsg)
@@ -108,12 +82,12 @@ func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayPro
 		}, nil
 	}
 
-	log.Debugf("Fetching config.json from S3 bucket %s", awsBucketName)
+	log.Debugf("Fetching cloudbeds_api_params.json from S3 bucket %s", awsBucketName)
 	//get information about mapping: room extension -- cloudbeds room ID
 	//fetchS3ObjectAndSaveToFile is a helper function to fetch object from S3 and save it to file
-	clBedsApiConfigFile, err := fetchS3ObjectAndSaveToFile(log, awsBucketName, "cloudbeds_api_params.json") // Replace with your bucket name and the file name
+	clBedsApiConfigFile, err := fetchS3ObjectAndSaveToFile(log, awsBucketName, "cloudbeds_api_params.json", awsRegion, customAWSConfig) // Replace with your bucket name and the file name
 	if err != nil || mapFullFileName == "" {
-		errMsg := fmt.Sprintf("failed to fetch object: %v. Check if AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID is set and S3 bucket with config.json exists", err)
+		errMsg := fmt.Sprintf("failed to fetch object: %v. Check if AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID is set and S3 bucket with cloudbeds_api_params.json exists", err)
 		log.Error(errMsg)
 		return events.APIGatewayProxyResponse{
 			StatusCode: http.StatusInternalServerError,
@@ -124,7 +98,10 @@ func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayPro
 	//parse config.json
 	configMap, err := configuration.New(log, mapFullFileName, clBedsApiConfigFile)
 	if err != nil {
-		log.Fatal(err) //TODO: add error handling. Try to load previous version of configMap
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       err.Error(),
+		}, nil
 	}
 
 	//create cloudbeds client
@@ -197,14 +174,15 @@ func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayPro
 		StatusCode: http.StatusOK,
 		Body:       msg,
 	}, nil
+
 }
 
 // fetchS3ObjectAndSaveToFile is a helper function to fetch object from S3 and save it to file
-func fetchS3ObjectAndSaveToFile(log *logrus.Logger, bucket, fileName string) (filename string, err error) {
+func fetchS3ObjectAndSaveToFile(log *logrus.Logger, bucket, fileName string, awsRegion string, customAWSConfig *aws.Config) (filename string, err error) {
 
-	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String(os.Getenv("AWS_REGION"))},
-	)
+	awsConfig := awsstore.PrepareAWSConfig(awsRegion, customAWSConfig)
+	fullFileName := fmt.Sprintf("/tmp/%s", fileName)
+	sess, err := session.NewSession(awsConfig)
 
 	if err != nil {
 		return "", err
@@ -212,7 +190,7 @@ func fetchS3ObjectAndSaveToFile(log *logrus.Logger, bucket, fileName string) (fi
 
 	downloader := s3manager.NewDownloader(sess)
 	log.Tracef("Downloading %s from bucket %s", fileName, bucket)
-	file, err := os.Create("/tmp/config.json") //save file to current directory. Exists only for current lambda execution
+	file, err := os.Create(fullFileName) //save file to current directory. Exists only for current lambda execution
 	if err != nil {
 		errMsg := fmt.Sprintf("Unable to open file %q for writing - %v", fileName, err)
 		log.Error(errMsg)
@@ -231,7 +209,6 @@ func fetchS3ObjectAndSaveToFile(log *logrus.Logger, bucket, fileName string) (fi
 		log.Error(errMsg)
 		return "", errors.New(errMsg)
 	}
-	fullFileName := fmt.Sprintf("/tmp/%s", fileName)
 	log.Tracef("Stored to %s from bucket %s, %d bytes", fullFileName, bucket, bytesDownloaded)
 	return fullFileName, nil
 }

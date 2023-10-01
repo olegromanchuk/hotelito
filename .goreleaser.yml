@@ -44,6 +44,6 @@ archives:
           format: zip
       files:
         - LICENSE
-        - README.md
+        - README_SAM.md
         - env_example
         - config.json
