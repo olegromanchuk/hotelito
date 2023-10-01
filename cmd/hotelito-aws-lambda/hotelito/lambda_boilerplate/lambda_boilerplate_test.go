@@ -2,6 +2,7 @@ package lambda_boilerplate
 
 import (
 	"bytes"
+	"github.com/olegromanchuk/hotelito/cmd/hotelito-aws-lambda/hotelito/localstacktest"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -15,7 +16,7 @@ func TestInitializeVariablesFromEnv(t *testing.T) {
 	logger.SetLevel(logrus.DebugLevel)
 
 	// Test with no environment variables set
-	os.Clearenv()
+	localstacktest.ClearEnvVars()
 	appName, environmentType, awsRegion := InitializeVariablesFromEnv(logger)
 
 	assert.Equal(t, defaultAppName, appName)
@@ -79,7 +80,7 @@ func TestInitializeLogger(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clear any existing env vars for this sub-test
-			os.Clearenv()
+			localstacktest.ClearEnvVars()
 
 			// Redirect stdout to a buffer
 			oldStdout := os.Stdout

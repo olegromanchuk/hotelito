@@ -2,7 +2,6 @@ package localstacktest
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
@@ -10,28 +9,17 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/ssm"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/modules/localstack"
 	"log"
 	"net"
 	"os"
-	"sync"
-	"sync/atomic"
 	"time"
-)
-
-var (
-	once                sync.Once
-	localstackContainer testcontainers.Container
-	testPackagesCounter int32
-	ctx                 context.Context
 )
 
 func GetCustomAWSConfig() *aws.Config {
 	localstack_host := os.Getenv("LOCALSTACK_HOST")
 	localstack_port := os.Getenv("LOCALSTACK_PORT")
 	if localstack_host == "" || localstack_port == "" {
-		log.Fatalf("💩🤷 Error getting localstack host and port from env variables. Check localstacktest.go and TestMain()")
+		log.Fatalf("💩🤷 LOCALSTACK TEST ERROR: Error getting localstack host and port from env variables. Check localstacktest.go and TestMain()")
 		return nil
 	}
 
@@ -45,55 +33,6 @@ func GetCustomAWSConfig() *aws.Config {
 			"token",
 		)}
 	return customAWSConfig
-}
-
-func StartLocalStack() error {
-	once.Do(func() {
-		var err error
-		ctx = context.Background() //not really used. We rely on CI/CD to clean up containers
-
-		localstackContainer, err = localstack.RunContainer(ctx,
-			testcontainers.WithImage("localstack/localstack:2.3.0"),
-		)
-
-		//Do not work properly. Do not use 1.4.0
-		//localstackContainer, err = localstack.RunContainer(ctx,
-		//	testcontainers.WithImage("localstack/localstack:1.4.0"),
-		//)
-		if err != nil {
-			panic(err)
-		}
-
-		host, err := localstackContainer.Host(ctx)
-		if err != nil {
-			fmt.Println("Error fetching container host:", err)
-			return
-		}
-
-		port, err := localstackContainer.MappedPort(ctx, "4566")
-		if err != nil {
-			fmt.Println("Error fetching container port:", err)
-			return
-		}
-
-		fmt.Printf("🔥🔥🔥 Localstack is running on %s:%s 🔥🔥🔥\n", host, port.Port())
-		// Now you can connect to LocalStack on this host and port.
-
-		//set env vars with host and port of localstack. Will be used later in tests
-		os.Setenv("LOCALSTACK_HOST", host)
-		os.Setenv("LOCALSTACK_PORT", string(port))
-
-	})
-	atomic.AddInt32(&testPackagesCounter, 1)
-	return nil
-}
-
-func StopLocalStack() error {
-	newCounterValue := atomic.AddInt32(&testPackagesCounter, -1)
-	if newCounterValue == 0 {
-		return localstackContainer.Terminate(ctx)
-	}
-	return nil
 }
 
 // CheckLocalStackHealth checks if localstack is running on LOCALSTACK_HOST:LOCALSTACK_PORT. Used only in case of useDockerLocalstack=true
@@ -130,7 +69,7 @@ func SaveValuesToLocalStack(mapOfValues map[string]string, customAWSConfig *aws.
 	sess, err := session.NewSession(customAWSConfig)
 
 	if err != nil {
-		log.Fatalf("Error creating session: %v", err)
+		log.Fatalf("💩🤷 LOCALSTACK TEST ERROR:  Error creating session: %v", err)
 		return
 	}
 
@@ -151,7 +90,7 @@ func SaveValuesToLocalStack(mapOfValues map[string]string, customAWSConfig *aws.
 
 		_, err = ssmSvc.PutParameter(putParamInput)
 		if err != nil {
-			log.Fatalf("Error putting SSM parameter: %v", err)
+			log.Fatalf("💩🤷 LOCALSTACK TEST ERROR: Error putting SSM parameter: %v", err)
 			return
 		}
 		log.Printf("Successfully put SSM parameter %s with value %s", paramName, paramValue)
@@ -166,7 +105,7 @@ func ClearLocalstackAllServices(awsCustomConfig *aws.Config) {
 func ClearLocalstackS3(awsCustomConfig *aws.Config) {
 	sess, err := session.NewSession(awsCustomConfig)
 	if err != nil {
-		log.Fatalf("Failed to create session: %v", err)
+		log.Fatalf("💩🤷 LOCALSTACK TEST ERROR: Failed to create session: %v", err)
 	}
 
 	s3Client := s3.New(sess)
@@ -220,7 +159,7 @@ func ClearLocalstackS3(awsCustomConfig *aws.Config) {
 func ClearLocalstackSSMStore(awsCustomConfig *aws.Config) {
 	sess, err := session.NewSession(awsCustomConfig)
 	if err != nil {
-		log.Fatalf("Failed to create session: %v", err)
+		log.Fatalf("💩🤷 LOCALSTACK TEST ERROR: Failed to create session: %v", err)
 	}
 
 	ssmClient := ssm.New(sess)
@@ -238,7 +177,7 @@ func ClearLocalstackSSMStore(awsCustomConfig *aws.Config) {
 		})
 
 	if err != nil {
-		log.Fatalf("Failed to describe parameters: %v", err)
+		log.Fatalf("💩🤷 LOCALSTACK TEST ERROR: Failed to describe parameters: %v", err)
 	}
 
 	// Delete all parameters
@@ -258,7 +197,7 @@ func CreateFilesInS3(awsCustomConfig *aws.Config, bucketName string, fileNames [
 	sess, err := session.NewSession(awsCustomConfig)
 
 	if err != nil {
-		log.Fatalf("Failed to create session: %v", err)
+		log.Fatalf("💩🤷 LOCALSTACK TEST ERROR: Failed to create session: %v", err)
 	}
 
 	// Create S3 service client
@@ -278,7 +217,7 @@ func CreateFilesInS3(awsCustomConfig *aws.Config, bucketName string, fileNames [
 			Bucket: aws.String(bucketName),
 		})
 		if err != nil {
-			log.Fatalf("Failed to create bucket: %v", err)
+			log.Fatalf("💩🤷 LOCALSTACK TEST ERROR: Failed to create bucket: %v", err)
 		}
 		log.Printf("Bucket %s created.", bucketName)
 	}
@@ -292,9 +231,26 @@ func CreateFilesInS3(awsCustomConfig *aws.Config, bucketName string, fileNames [
 			Key:    aws.String(fileName),
 		})
 		if err != nil {
-			log.Fatalf("Failed to upload file: %v", err)
+			log.Fatalf("💩🤷 LOCALSTACK TEST ERROR: Failed to upload file: %v", err)
 		} else {
 			log.Printf("Successfully created empty file %s in bucket %s", fileName, bucketName)
 		}
+	}
+}
+
+func ClearEnvVars() {
+	vars := []string{
+		"CLOUDBEDS_CLIENT_ID",
+		"CLOUDBEDS_CLIENT_SECRET",
+		"CLOUDBEDS_REDIRECT_URL",
+		"CLOUDBEDS_AUTH_URL",
+		"CLOUDBEDS_TOKEN_URL",
+		"CLOUDBEDS_SCOPES",
+		"AWS_REGION",
+		"AWS_S3_BUCKET_4_MAP_3CXROOMEXT_CLBEDSROOMID",
+	}
+
+	for _, v := range vars {
+		os.Unsetenv(v)
 	}
 }

@@ -8,25 +8,19 @@ import (
 	"github.com/olegromanchuk/hotelito/cmd/hotelito-aws-lambda/hotelito/localstacktest"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"log"
 	"os"
 	"testing"
 )
 
 func TestMain(m *testing.M) {
-	if err := localstacktest.StartLocalStack(); err != nil {
-		panic(err)
-	}
+
+	os.Setenv("LOCALSTACK_HOST", "localhost")
+	os.Setenv("LOCALSTACK_PORT", "4566")
 
 	fmt.Printf("🧪🚀 Tests started init_auth\n")
 	// run tests
 	code := m.Run()
 	fmt.Printf("🧪✅ Tests finished init_auth\n")
-
-	// Terminate LocalStack if this is the last package
-	if err := localstacktest.StopLocalStack(); err != nil {
-		log.Fatalf("Could not terminate LocalStack: %v", err)
-	}
 	os.Exit(code)
 }
 
@@ -95,7 +89,7 @@ func TestExecute(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Unset env variables
-			os.Clearenv()
+			localstacktest.ClearEnvVars()
 
 			if tt.setEnvironmentVariables {
 				// Unset env variables after the "success" test case
@@ -120,7 +114,7 @@ func TestExecute(t *testing.T) {
 			}
 
 			// Unset env variables
-			os.Clearenv()
+			localstacktest.ClearEnvVars()
 		})
 	}
 }
