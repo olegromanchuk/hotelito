@@ -53,14 +53,14 @@ Note, that the server with the app should have a public **valid** HTTPS endpoint
 1. Get Cloudbeds API credentials. Make sure that you select a proper permission scope  
 `read:reservation,write:reservation,read:room,write:room,read:housekeeping,write:housekeeping,read:item,write:item`  
  
-2. SKIP it for AWS lambda version.  
+2. SKIP it for AWS lambda version (will be set later. Read AWS installation section)  
 Set a correct redirect URL. It should be  
 `https://mypublic.api.address/api/v1/callback`
 
 3. You will need to create a configuration file with the credentials (.env). Check env_example for the list of required variables.  
-   PS. `APPLICATION_NAME` will be used in AWS Parameter Store path (if AWS lambda version is used).
+   PS. `APPLICATION_NAME` will be used in AWS Parameter Store path if AWS lambda version is used.
 
-4. `CLOUDBEDS_REDIRECT_URL` should be set to the public IP address of the server plus "/api/v1/callback". On this URL Cloudbeds authentication server will send an authorization code as part of the authentication process [OAuth2](https://integrations.cloudbeds.com/hc/en-us/articles/360006450433-OAuth-2-0).
+4. `CLOUDBEDS_REDIRECT_URL` should be set to the public IP address of the server plus "/api/v1/callback". On this URL Cloudbeds authentication server will send an authorization code as part of the authentication process [OAuth2](https://integrations.cloudbeds.com/hc/en-us/articles/360006450433-OAuth-2-0). For AWS installation update this parameter after the installation is finished. It will be outputted by the installation script. 
 
 5. Install the app.
 
@@ -83,18 +83,46 @@ For more details check [GH-15](https://github.com/olegromanchuk/hotelito/issues/
 - Install AWS [cli](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) and AWS SAM [cli](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html).
 - [Configure](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html) AWS cli with your credentials
 - Install [Go 1.21.X](https://golang.org/doc/install)
+- Clone [this repo](https://github.com/olegromanchuk/hotelito.git)  
+```
+git clone https://github.com/olegromanchuk/hotelito.git
+cd hotelito
+```
 - Create .env file that contains all the configuration parameters. See included env_example.  
 Notes on .env file:
     * CLOUDBEDS_AUTH_URL and CLOUDBEDS_TOKEN_URL are Cloudbeds endpoints on 07/2023. They should not be changed unless Cloudbeds changes them.
-    * CLOUDBEDS_REDIRECT_URL will be determined after lambda installation. You can leave it as "it is" for now.
+    * CLOUDBEDS_REDIRECT_URL will be determined after lambda installation. You can leave it as it is for now.
     * PORT parameter is not used in AWS lambda version.
     * LOG_LEVEL: acceptable values are [Trace, Debug, Info, Warning, Error, Fatal, Panic]
 - `cd cmd/hotelito-aws-lambda`
-- Run `sam deploy --guided --profile MY_AWS_PROFILE --no-execute-changeset`. This action is needed to create samconfig.toml file that will be used by the installation script. [More details on how `sam deploy` works](#how-sam-deploy-works)  
+- Run `sam deploy --guided --profile MY_AWS_PROFILE --no-execute-changeset`. This action is needed to create samconfig.toml file that will be used by the installation script. [More details on how `sam deploy` works](#how-sam-deploy-works).  
+This command **WILL NOT** deploy the application. It will only create samconfig.toml file.  
 Notes on `sam deploy guided --profile MY_AWS_PROFILE --no-execute-changeset`:
-    * leave `SAM configuration file [samconfig.toml]:` in default value: *samconfig.toml*
     * Allow SAM CLI IAM role creation: Y
+    * Reply "Y" on questions about authentication:
     * Save arguments to samconfig.toml: Y
+    * leave `SAM configuration file [samconfig.toml]:` in default value: *samconfig.toml*
+```
+	Stack Name [sam-app]: sam-hotelito-app
+	AWS Region [us-west-2]:
+	Parameter Environment [production]:
+	Parameter ApplicationName [hotelito-app]:
+	Parameter LogLevel [debug]:
+	Parameter S3BucketMapName3CXRoomExtClBedsRoomId [hotelito-app-3cxroomextension-cloudbedsroomid]:
+	#Shows you resources changes to be deployed and require a 'Y' to initiate deploy
+	Confirm changes before deploy [y/N]: y
+	#SAM needs permission to be able to create roles to connect to the resources in your template
+	Allow SAM CLI IAM role creation [Y/n]: Y
+	#Preserves the state of previously provisioned resources when an operation fails
+	Disable rollback [y/N]: y
+	InitialAuthorizationFunction has no authentication. Is this okay? [y/N]: y
+	CallbackFunction has no authentication. Is this okay? [y/N]: y
+	3CXLookupByNumberFunction has no authentication. Is this okay? [y/N]: y
+	3CXOutboundCallFunction has no authentication. Is this okay? [y/N]: y
+	Save arguments to configuration file [Y/n]: Y
+	SAM configuration file [samconfig.toml]:
+	SAM configuration environment [default]:
+```
 - Run `make deploy`. This script will deploy the application.
 - Set the correct redirect URL in Cloudbeds portal. It will be outputted by the script as "REDIRECT URL". It should be something like `https://deadbeef.execute-api.us-east-1.amazonaws.com/Prod/api/v1/callback`
 
@@ -215,7 +243,7 @@ sam local start-api -e events/event_org.json --env-vars environmental_vars.json
 `sam local generate-event apigateway aws-proxy --method POST --body '{"Number": "2222222501", "CallType": "Outbound", "CallDirection": "Outbound", "Name": "ExampleName", "Agent": "501", "AgentFirstName": "ExampleAgentFirstName", "DateTime": "2023-07-07T14:15:22Z"}' --path '3cx/outbound_call' > events/event_3cx_call.json`
 
 ### How sam deploy works
-`sam deploy --guided` when run first time creates CF script that creates sam S3 buckets for uploading lambda. Also, it creates a samconfig.toml file. If you set custom profile with `sam deploy --guided --profile MY_AWS_PROFILE`, then MY_AWS_PROFILE will appear in samconfig.toml as `"profile"=MYPROFILE`  
+`sam deploy --guided` when run first time creates CF script that creates sam S3 buckets for uploading lambda. Also, it creates a samconfig.toml file. If you set custom profile with `sam deploy --guided --profile MY_AWS_PROFILE`, then MY_AWS_PROFILE will appear in samconfig.toml as `"profile"=MYPROFILE`.  
 `deploy_aws.sh` will check on this line and if it is not set will propose to use "default" profile.
 
 
