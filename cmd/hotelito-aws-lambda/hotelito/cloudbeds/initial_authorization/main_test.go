@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/aws/aws-lambda-go/events"
@@ -115,6 +116,40 @@ func TestExecute(t *testing.T) {
 
 			// Unset env variables
 			localstacktest.ClearEnvVars()
+		})
+	}
+}
+
+func TestHandleInit(t *testing.T) {
+	type args struct {
+		ctx     context.Context
+		request events.APIGatewayProxyRequest
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    events.APIGatewayProxyResponse
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{name: "test 1",
+			args: args{
+				ctx:     context.Background(),
+				request: events.APIGatewayProxyRequest{},
+			},
+			want: events.APIGatewayProxyResponse{
+				StatusCode: 500,
+			},
+			wantErr: assert.NoError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := HandleInit(tt.args.ctx, tt.args.request)
+			if !tt.wantErr(t, err, fmt.Sprintf("HandleInit(%v, %v)", tt.args.ctx, tt.args.request)) {
+				return
+			}
+			assert.Equalf(t, tt.want.StatusCode, got.StatusCode, "HandleInit(%v, %v)", tt.args.ctx, tt.args.request)
 		})
 	}
 }

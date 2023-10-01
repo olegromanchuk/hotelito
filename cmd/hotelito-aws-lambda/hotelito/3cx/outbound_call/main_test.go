@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go/aws"
@@ -177,7 +178,7 @@ func TestExecute(t *testing.T) {
 func TestFetchS3ObjectAndSaveToFile(t *testing.T) {
 
 	//get localstack config from env variables
-	customAWSConfig := localstacktest.GetCustomAWSConfig()
+	customAWSConfig := *localstacktest.GetCustomAWSConfig() //we use real value, not pointer here. It is needed to keep consitency between tests. Otherwise, we will have a problem with localstacktest.ClearLocalstackAllServices(&customAWSConfig), when you try to clean up SSM Store for non-existing region.
 
 	tests := []struct {
 		name            string
@@ -185,15 +186,17 @@ func TestFetchS3ObjectAndSaveToFile(t *testing.T) {
 		fileName        string
 		content         string
 		awsRegion       string
+		customAWSConfig aws.Config
 		expectError     bool
 		expectedContent string
 	}{
 		{
-			name:            "Success",
+			name:            "test 1. Success",
 			bucket:          "test-bucket",
 			fileName:        "test-file.txt",
 			content:         "test content",
 			awsRegion:       "us-east-1",
+			customAWSConfig: customAWSConfig,
 			expectError:     false,
 			expectedContent: "test content",
 		},
@@ -203,10 +206,12 @@ func TestFetchS3ObjectAndSaveToFile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup
+			localstacktest.ClearLocalstackAllServices(&tt.customAWSConfig)
+
 			log := logrus.New()
 
 			// Connect to LocalStack S3
-			sess, err := session.NewSession(customAWSConfig)
+			sess, err := session.NewSession(&customAWSConfig)
 			require.NoError(t, err)
 
 			s3Client := s3.New(sess)
@@ -226,8 +231,9 @@ func TestFetchS3ObjectAndSaveToFile(t *testing.T) {
 			})
 			require.NoError(t, err)
 
+			tt.customAWSConfig.Region = aws.String(tt.awsRegion)
 			// Test
-			downloadedFileName, err := fetchS3ObjectAndSaveToFile(log, tt.bucket, tt.fileName, tt.awsRegion, customAWSConfig)
+			downloadedFileName, err := fetchS3ObjectAndSaveToFile(log, tt.bucket, tt.fileName, tt.awsRegion, &tt.customAWSConfig)
 			if tt.expectError {
 				require.Error(t, err)
 				return
@@ -243,6 +249,41 @@ func TestFetchS3ObjectAndSaveToFile(t *testing.T) {
 			// Cleanup
 			err = os.Remove(downloadedFileName)
 			require.NoError(t, err)
+
+		})
+	}
+}
+
+func TestHandleProcessOutboundCall(t *testing.T) {
+	type args struct {
+		ctx     context.Context
+		request events.APIGatewayProxyRequest
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    events.APIGatewayProxyResponse
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{name: "test 1",
+			args: args{
+				ctx:     context.Background(),
+				request: events.APIGatewayProxyRequest{},
+			},
+			want: events.APIGatewayProxyResponse{
+				StatusCode: 200,
+			},
+			wantErr: assert.NoError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := HandleProcessOutboundCall(tt.args.ctx, tt.args.request)
+			if !tt.wantErr(t, err, fmt.Sprintf("HandleProcessOutboundCall(%v, %v)", tt.args.ctx, tt.args.request)) {
+				return
+			}
+			assert.Equalf(t, tt.want.StatusCode, got.StatusCode, "HandleProcessOutboundCall(%v, %v)", tt.args.ctx, tt.args.request)
 		})
 	}
 }

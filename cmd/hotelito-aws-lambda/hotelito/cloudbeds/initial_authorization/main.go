@@ -26,10 +26,8 @@ func HandleInit(ctx context.Context, request events.APIGatewayProxyRequest) (eve
 	responseApiGateway, err := Execute(log, nil)
 	if err != nil {
 		log.Errorf("Error executing handler: %v", err)
-		return events.APIGatewayProxyResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       fmt.Sprintf("Error: %v", err),
-		}, err
+		responseApiGateway.StatusCode = http.StatusInternalServerError //
+		responseApiGateway.Body = fmt.Sprintf("Error: %v", err)
 	}
 
 	return responseApiGateway, nil
