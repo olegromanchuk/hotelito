@@ -172,6 +172,11 @@ This weirdo routing manipulations are necessary to properly collect all informat
 If you decide to remove the app from AWS Lambda, make sure to remove all the parameters from AWS Parameter Store. Otherwise, they will be left there and will be accessible to anyone who has access to your AWS account.
 All other components will be removed automatically as soon as you remove stack from CloudFormation.
 
+### Install AWS Lambda version
+1. Delete stack from CloudFormation
+2. Clean S3 bucket "hotelito-app-3cxroomextension-cloudbedsroomid".
+3. Run ./uninstall_aws.sh. It will remove all SSM Parameter Store.
+4. Remove leftovers started from "hotelito-app/" from SSM Parameter Store.
 
 #### Troubleshooting
 If something went wrong: delete samconfig.toml file and run `sam deploy guided --profile MY_AWS_PROFILE --no-execute-changeset` again.
@@ -272,3 +277,4 @@ Generate mock file for advanced testing:`mockgen -source=aws.go -destination=moc
 [x] workflows  
 [x] TODO moved to GH Issues  
 [x] workflows  
+[x] move TODO to [Issues](https://github.com/olegromanchuk/hotelito/issues)

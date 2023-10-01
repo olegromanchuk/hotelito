@@ -60,7 +60,7 @@ while read line; do
     value="${line#*=}"
 
     # create or update the parameter in the Parameter Store
-    echo "Setting ${path_prefix}/${path_prefix_env}/${name}"
+    echo "Deleting ${path_prefix}/${path_prefix_env}/${name}"
     aws --profile ${AWS_CONFIG_PROFILE} ssm delete-parameter \
       --name "${path_prefix}/${path_prefix_env}/${name}"
   fi
