@@ -53,8 +53,13 @@ func StartLocalStack() error {
 		ctx = context.Background() //not really used. We rely on CI/CD to clean up containers
 
 		localstackContainer, err = localstack.RunContainer(ctx,
-			testcontainers.WithImage("localstack/localstack:1.4.0"),
+			testcontainers.WithImage("localstack/localstack:2.3.0"),
 		)
+
+		//Do not work properly. Do not use 1.4.0
+		//localstackContainer, err = localstack.RunContainer(ctx,
+		//	testcontainers.WithImage("localstack/localstack:1.4.0"),
+		//)
 		if err != nil {
 			panic(err)
 		}
@@ -167,10 +172,7 @@ func ClearLocalstackS3(awsCustomConfig *aws.Config) {
 	s3Client := s3.New(sess)
 
 	// List all buckets
-	listBucketsOutput, err := s3Client.ListBuckets(&s3.ListBucketsInput{})
-	if err != nil {
-		log.Fatalf("Failed to list buckets: %v", err)
-	}
+	listBucketsOutput, _ := s3Client.ListBuckets(&s3.ListBucketsInput{})
 
 	for _, bucket := range listBucketsOutput.Buckets {
 		bucketName := aws.StringValue(bucket.Name)
@@ -268,6 +270,7 @@ func CreateFilesInS3(awsCustomConfig *aws.Config, bucketName string, fileNames [
 	input := &s3.HeadBucketInput{
 		Bucket: aws.String(bucketName),
 	}
+
 	_, err = s3Client.HeadBucket(input)
 	if err != nil {
 		// Create bucket if it doesn't exist
@@ -281,7 +284,6 @@ func CreateFilesInS3(awsCustomConfig *aws.Config, bucketName string, fileNames [
 	}
 
 	for _, fileName := range fileNames {
-		fileName = fileName
 
 		// Create empty JSON file and upload
 		_, err = s3Client.PutObject(&s3.PutObjectInput{
