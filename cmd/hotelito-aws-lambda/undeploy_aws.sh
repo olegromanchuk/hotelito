@@ -48,6 +48,11 @@ done <${ENV_FILE}
 
 # read the .env file
 while read line; do
+
+  if [[ "$line" == "#"* ]] || [[ "$line" == "//"* ]]; then
+    continue
+  fi
+
   # skip empty lines
   if [ -n "$line" ]; then
     # split the line into name and value
