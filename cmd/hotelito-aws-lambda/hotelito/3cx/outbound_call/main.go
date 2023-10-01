@@ -40,6 +40,7 @@ func HandleProcessOutboundCall(ctx context.Context, request events.APIGatewayPro
 		responseApiGateway.Body = fmt.Sprintf("Error: %v", err)
 	}
 
+	responseApiGateway.StatusCode = http.StatusOK //we need to reply with dignity: 200 to cloudbeds, even if error is returned
 	return responseApiGateway, nil
 }
 
