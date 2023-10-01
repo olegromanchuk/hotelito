@@ -47,6 +47,7 @@ echo "Using file: ${ENV_FILE}"
 
 # read the .env file
 while IFS= read -r line || [[ -n "$line" ]]; do
+
   if [ -n "$line" ]; then
     # split the line into name and value
     name="${line%=*}"
@@ -72,6 +73,12 @@ done <${ENV_FILE}
 
 # read the .env file
 while IFS= read -r line || [[ -n "$line" ]]; do
+
+    # Skip lines that are comments
+      if [[ "$line" == "#"* ]] || [[ "$line" == "//"* ]]; then
+        continue
+      fi
+
   # skip empty lines
   if [ -n "$line" ]; then
     # split the line into name and value
@@ -115,11 +122,12 @@ sam deploy \
 
 sleep 10 # just in case - wait for the stack to be created
 
+APIID=$(aws apigateway get-rest-apis --profile=${AWS_CONFIG_PROFILE} | jq -r ".items[] | select (.name == \"${STACKNAME}\") | .id")
+echo "APIID: ${APIID}, AWS_CONFIG_PROFILE: ${AWS_CONFIG_PROFILE}, STACKNAME: ${STACKNAME}"
+
 # 3. Update the API Gateway throttling settings
 read -p "Set throttling on API gateway. Rate:4, burst:2? yes/no: " DEVEL
 if [[ ${DEVEL} == "yes" ]]; then
-  APIID=$(aws apigateway get-rest-apis --profile=${AWS_CONFIG_PROFILE} | jq -r ".items[] | select (.name == \"${STACKNAME}\") | .id")
-  echo "APIID: ${APIID}, AWS_CONFIG_PROFILE: ${AWS_CONFIG_PROFILE}, STACKNAME: ${STACKNAME}"
   aws apigateway update-stage \
     --profile=${AWS_CONFIG_PROFILE} \
     --rest-api-id="${APIID}" \
@@ -134,6 +142,7 @@ if [[ ${DEVEL} == "yes" ]]; then
 fi
 
 # Delete stage "Stage" from API Gateway if any
+echo "Deleting stage \"Stage\" from API Gateway if any"
 # Get the stages
 STAGES=$(aws apigateway get-stages \
   --profile=${AWS_CONFIG_PROFILE} \
@@ -174,11 +183,22 @@ aws ssm put-parameter \
 
 # 5. create 3CX template
 # create copy of template
+echo "Creating 3CX template from ${ORIGINAL_FILE_3CX} to ${FINAL_FILE_3CX}. Currect directory: $(pwd)"
 cp -prf ${ORIGINAL_FILE_3CX} ${FINAL_FILE_3CX}
 API_BASE_URL="https://${FUNC_NAME}.execute-api.${AWS_REGION}.amazonaws.com/Prod"
 
 # replace the TEMPLATE_API_URL on API_BASE_URL
-sed -i "" -e "s|TEMPLATE_API_URL|${API_BASE_URL}|" ${FINAL_FILE_3CX}
+echo "Replacing TEMPLATE_API_URL with ${API_BASE_URL} in ${FINAL_FILE_3CX}"
+
+# macOS and GNU/Linux have different sed syntax
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  # macOS
+  sed -i "" -e "s|TEMPLATE_API_URL|${API_BASE_URL}|" ${FINAL_FILE_3CX}
+else
+  # CentOS and other GNU/Linux
+  sed -i -e "s|TEMPLATE_API_URL|${API_BASE_URL}|" ${FINAL_FILE_3CX}
+fi
+
 
 # 6. Upload config.json to S3
 # Set the bucket name variable
