@@ -44,6 +44,6 @@ archives:
           format: zip
       files:
         - LICENSE
-        - README_SAM.md
+        - cmd/hotelito-aws-lambda/README_SAM.md
         - env_example
         - config.json
