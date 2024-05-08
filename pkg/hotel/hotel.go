@@ -1,3 +1,5 @@
+// Package hotel is a package that provides an interface for a hotel.
+// It is a common interface for different hospitality providers
 package hotel
 
 /*
@@ -60,7 +62,7 @@ package hotel
 	}
 */
 
-// Room is a struct that represents a room in a hospitality. It might be different from particular implementation, but it is a common interface
+// Room is a struct that represents a room in a hospitality provider
 type Room struct {
 	RoomID            string `json:"roomID"`
 	RoomName          string `json:"roomName"`
@@ -76,6 +78,7 @@ type Room struct {
 	RoomOccupied      bool   `json:"RoomOccupied,omitempty"`
 }
 
+// HospitalityProvider is an interface that represents a hospitality provider
 type HospitalityProvider interface {
 	GetRooms() ([]Room, error)
 	GetRoom(roomNumber string, mapFileName string) (Room, error)
@@ -84,10 +87,12 @@ type HospitalityProvider interface {
 	HandleInitialLogin() (url string, err error)
 }
 
+// DetailedError is a struct that represents an error with a status code and details
 type DetailedError struct {
 	Msg               error
 	StatusCodeMessage string
 	Details           string
 }
 
+// Error returns the error message
 func (e *DetailedError) Error() string { return e.Msg.Error() }

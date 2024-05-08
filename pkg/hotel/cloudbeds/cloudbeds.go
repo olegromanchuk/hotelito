@@ -1,3 +1,9 @@
+// Package cloudbeds represents an implementation of hospitality provider.
+// It presents a list of functions to authenticate and interact with Cloudbeds API.
+// Credentials for Cloudbeds API are stored in secret store.
+// Initial authentication is done via oauth2.
+// If no credentials found (first time login) a user is redirected to the initial login page on the Cloudbeds website.
+// Callback from Cloudbeds website is handled by HandleOAuthCallback function and stores credentials in the secret store.
 package cloudbeds
 
 import (
